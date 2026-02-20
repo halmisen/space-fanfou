@@ -60,8 +60,9 @@ class SidebarStatistics extends Component {
       if (match) return match[1]
     }
 
-    // 回退：从 URL 路径提取（fanfou.com/<userId>）
-    return window.location.pathname.split('/').filter(Boolean)[0] || ''
+    // 回退：从 URL 路径提取（fanfou.com/<userId>），需 decode 中文 ID
+    const raw = window.location.pathname.split('/').filter(Boolean)[0] || ''
+    try { return decodeURIComponent(raw) } catch { return raw }
   }
 
   async fetchUserProfileData() {

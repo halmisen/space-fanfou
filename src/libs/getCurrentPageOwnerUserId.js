@@ -5,7 +5,14 @@ import { isUserProfilePage } from '@libs/pageDetect'
 export default simpleMemoize(async () => {
   const splitPathname = window.location.pathname.split('/')
 
-  return await isUserProfilePage()
+  // decodeURIComponent：用户 ID 可能是中文（如 鱼小颜），URL 中以 %E9%B1%BC... 形式存储
+  const raw = await isUserProfilePage()
     ? splitPathname[1] // fanfou.com/<userid>
     : splitPathname[2] // fanfou.com/album/<userid>
+
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
 })
