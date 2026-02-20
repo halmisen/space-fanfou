@@ -52,10 +52,16 @@ class SidebarStatistics extends Component {
   }
 
   getUserId() {
-    const metaContent = select('meta[name=author]').content
-    const userId = metaContent.match(/\((.+)\)/)[1]
+    // 优先从 meta[name=author] 提取（格式：名字(userId)）
+    // 该 meta 标签只在页面所有者自己访问时存在，他人页面可能为 null
+    const meta = select('meta[name=author]')
+    if (meta) {
+      const match = meta.content.match(/\(([^)]+)\)$/)
+      if (match) return match[1]
+    }
 
-    return userId
+    // 回退：从 URL 路径提取（fanfou.com/<userId>）
+    return window.location.pathname.split('/').filter(Boolean)[0] || ''
   }
 
   async fetchUserProfileData() {
