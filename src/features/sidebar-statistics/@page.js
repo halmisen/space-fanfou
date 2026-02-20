@@ -3,12 +3,27 @@ import { h, Component } from 'preact'
 import select from 'select-dom'
 import cx from 'classnames'
 import clamp from 'just-clamp'
-import retry from 'p-retry'
-import jsonp from '@libs/jsonp'
 import Tooltip from '@libs/Tooltip'
 import { isUserProfilePage } from '@libs/pageDetect'
 import preactRender from '@libs/preactRender'
 import formatDate from '@libs/formatDate'
+
+// 从 m.fanfou.com 用户最后几页消息里提取最早时间戳（近似注册时间）
+async function fetchOldestStatusDate(userId, lastPage, proxiedFetch) {
+  for (let page = lastPage; page >= Math.max(1, lastPage - 2); page--) {
+    const { error, responseText: html } = await proxiedFetch.get({
+      url: `https://m.fanfou.com/${userId}/p.${page}`,
+    })
+    if (error || !html) continue
+
+    // m.fanfou.com 消息时间格式：YYYY-MM-DD HH:MM
+    const dates = html.match(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/g)
+    if (dates && dates.length > 0) {
+      return dates[dates.length - 1]  // 页面最后一条 = 最早的
+    }
+  }
+  return null
+}
 
 class SidebarStatistics extends Component {
   constructor(...args) {
@@ -32,7 +47,7 @@ class SidebarStatistics extends Component {
       const userProfile = await this.fetchUserProfileData()
       this.processData(userProfile)
     } catch (error) {
-      this.setState({ registerDateText: 'API 不可用' })
+      this.setState({ registerDateText: '暂无数据' })
     }
   }
 
@@ -44,24 +59,47 @@ class SidebarStatistics extends Component {
   }
 
   async fetchUserProfileData() {
-    const apiUrl = '//api.fanfou.com/users/show.json'
-    const params = { id: this.getUserId() }
-    const fetch = () => jsonp(apiUrl, { params, timeout: 10000 })
-    const userProfileData = await retry(fetch, {
-      retries: 3,
-      minTimeout: 250,
-    })
+    const userId = this.getUserId()
+    const { proxiedFetch } = this.props
+    const userProfile = {}
 
-    return userProfileData
+    // 1. 从页面 DOM 提取各项计数（通过 href 精确定位，不依赖文本格式）
+    const getCount = href => {
+      const el = select(`a[href="${href}"] .count`)
+
+      return el ? parseInt(el.textContent.replace(/\D/g, ''), 10) : 0
+    }
+
+    userProfile.statuses_count = getCount(`/${userId}`)
+    userProfile.friends_count = getCount(`/friends/${userId}`)
+    userProfile.followers_count = getCount(`/followers/${userId}`)
+
+    // 2. 背景图：从 body 的计算样式提取 URL
+    const bgImage = getComputedStyle(document.body).backgroundImage
+    if (bgImage && bgImage !== 'none') {
+      userProfile.profile_background_image_url = bgImage.replace(/^url\(["']?|["']?\)$/g, '')
+    }
+
+    // 3. 加锁状态：检查页面是否有私密账号标志
+    userProfile.protected = select.exists('.locked, .private-icon, [class*="private"]')
+
+    // 4. 近似注册时间：抓取用户最后一页消息，取最早一条的时间戳
+    if (userProfile.statuses_count > 0 && proxiedFetch) {
+      const lastPage = Math.ceil(userProfile.statuses_count / 30)
+      const oldestDate = await fetchOldestStatusDate(userId, lastPage, proxiedFetch)
+      if (oldestDate) userProfile.created_at = oldestDate
+    }
+
+    return userProfile
   }
 
   processData(userProfile) {
     // 是否加锁
     const isProtected = userProfile.protected
 
-    // 注册时间
+    // 注册时间（来自最早消息，为近似值）
     const registerDate = new Date(userProfile.created_at)
-    const registerDateText = formatDate(registerDate)
+    const registerDateText = `约 ${formatDate(registerDate)}`
 
     // 注册时长
     const registerDays = Math.floor((new Date() - registerDate) /
@@ -186,7 +224,8 @@ class StatisticItem extends Component {
 }
 
 export default context => {
-  const { elementCollection } = context
+  const { elementCollection, requireModules } = context
+  const { proxiedFetch } = requireModules([ 'proxiedFetch' ])
 
   let unmount
 
@@ -200,7 +239,7 @@ export default context => {
     waitReady: () => elementCollection.ready('stabs'),
 
     onLoad() {
-      unmount = preactRender(<SidebarStatistics />, rendered => {
+      unmount = preactRender(<SidebarStatistics proxiedFetch={proxiedFetch} />, rendered => {
         elementCollection.get('stabs').after(rendered)
       })
     },
