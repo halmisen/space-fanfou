@@ -4,16 +4,15 @@ import select from 'select-dom'
 import cx from 'classnames'
 import clamp from 'just-clamp'
 import Tooltip from '@libs/Tooltip'
-import { isUserProfilePage } from '@libs/pageDetect'
+import { isUserProfilePage, isLoggedInUserProfilePage } from '@libs/pageDetect'
 import preactRender from '@libs/preactRender'
 import formatDate from '@libs/formatDate'
 
-// 从 m.fanfou.com 用户最后几页消息里提取最早时间戳（近似注册时间）
+// 从 m.fanfou.com 抓取最早消息时间（仅对自己的页面有效，他人页面受移动站限制只显示近期内容）
 async function fetchOldestStatusDate(userId, lastPage, proxiedFetch) {
   for (let page = lastPage; page >= Math.max(1, lastPage - 2); page--) {
-    const { error, responseText: html } = await proxiedFetch.get({
-      url: `https://m.fanfou.com/${userId}/p.${page}`,
-    })
+    const url = `https://m.fanfou.com/${encodeURIComponent(userId)}/p.${page}`
+    const { error, responseText: html } = await proxiedFetch.get({ url })
     if (error || !html) continue
 
     // m.fanfou.com 消息时间格式：YYYY-MM-DD HH:MM
@@ -90,8 +89,8 @@ class SidebarStatistics extends Component {
     // 3. 加锁状态：检查页面是否有私密账号标志
     userProfile.protected = select.exists('.locked, .private-icon, [class*="private"]')
 
-    // 4. 近似注册时间：抓取用户最后一页消息，取最早一条的时间戳
-    if (userProfile.statuses_count > 0 && proxiedFetch) {
+    // 4. 近似注册时间：仅对自己的页面抓取（m.fanfou.com 对他人页面只开放近期消息，无法获取最早记录）
+    if (isLoggedInUserProfilePage() && userProfile.statuses_count > 0 && proxiedFetch) {
       const lastPage = Math.ceil(userProfile.statuses_count / 30)
       const oldestDate = await fetchOldestStatusDate(userId, lastPage, proxiedFetch)
       if (oldestDate) userProfile.created_at = oldestDate
@@ -103,6 +102,24 @@ class SidebarStatistics extends Component {
   processData(userProfile) {
     // 是否加锁
     const isProtected = userProfile.protected
+
+    // 注册时间不可获取（他人页面 m.fanfou.com 仅开放近期消息，无法确定注册时间）
+    if (!userProfile.created_at) {
+      const bgImage = userProfile.profile_background_image_url
+      const isBackgroundImageDisabled = getComputedStyle(document.body).backgroundImage === 'none'
+
+      this.setState({
+        isProtected,
+        registerDateText: '不可获取',
+        registerDurationText: '—',
+        statusFrequencyText: `共 ${userProfile.statuses_count || 0} 条消息`,
+        statusFrequencyProgress: 0,
+        influenceIndexText: `${userProfile.followers_count || 0} 位关注者`,
+        influenceIndexProgress: 0,
+        backgroundImageUrl: isBackgroundImageDisabled ? null : bgImage,
+      })
+      return
+    }
 
     // 注册时间（来自最早消息，为近似值）
     const registerDate = new Date(userProfile.created_at)
