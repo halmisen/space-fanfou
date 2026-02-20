@@ -69,9 +69,11 @@ class SidebarStatistics extends Component {
     const { proxiedFetch } = this.props
     const userProfile = {}
 
-    // 1. 从页面 DOM 提取各项计数（通过 href 精确定位，不依赖文本格式）
+    // 1. 从页面 DOM 提取各项计数
+    // 计数 widget 固定在 #user_stats 容器内，精确限定范围避免误匹配页面其他区域
+    const userStats = select('#user_stats') || document
     const getCount = href => {
-      const el = select(`a[href="${href}"] .count`)
+      const el = select(`a[href="${href}"] .count`, userStats)
 
       return el ? parseInt(el.textContent.replace(/\D/g, ''), 10) : 0
     }
