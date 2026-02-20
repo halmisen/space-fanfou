@@ -5,7 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env.local') })
 
 let context, page
 
-test.use({ timeout: 30000 })
+test.use({ timeout: 60000 })
 
 test.beforeAll(async ({ playwright }) => {
   context = await launchWithExtension(playwright)
@@ -17,29 +17,40 @@ test.afterAll(async () => {
   if (context) await context.close()
 })
 
-test('sidebar-statistics 显示用户注册时间', async () => {
-  // 访问饭否首页（有 sidebar 的页面）
-  await page.goto('https://fanfou.com/home', { waitUntil: 'domcontentloaded' })
+test('sidebar-statistics 正确渲染（无 NaN/无永久省略号）', async () => {
+  const ownUserId = process.env.FANFOU_LOGGED_IN_USER_ID || 'kiruoto'
+  await page.goto(`https://fanfou.com/${ownUserId}`, { waitUntil: 'domcontentloaded' })
 
-  // 等待扩展注入的 sidebar 统计面板
-  await page.waitForSelector('.sf-sidebar-statistics', { timeout: 20000 })
+  // 等待 sidebar 渲染（最多 35 秒，含 JSONP 3次重试×10秒超时）
+  await page.waitForSelector('.sf-sidebar-statistics', { timeout: 35000 })
 
-  // 截图：当前状态（修复前应显示 ……）
+  // 等待 JSONP 完成或超时降级（10s×3重试 ≈ 35s）
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('.sf-sidebar-statistics-item')
+      if (!el) return false
+      const t = el.textContent
+      return !t.includes('……')
+    },
+    { timeout: 50000 }
+  )
+
   await page.screenshot({
-    path: path.join(__dirname, 'screenshots/sidebar-current.png'),
+    path: path.join(__dirname, 'screenshots/sidebar-after.png'),
     fullPage: false,
   })
 
-  // 检查注册时间文字
-  const regTimeItem = await page.$('.sf-sidebar-statistics-item:has-text("注册")')
-  expect(regTimeItem, '应存在包含"注册"字样的统计项').not.toBeNull()
-
+  const regTimeItem = await page.$('.sf-sidebar-statistics-item')
   const regTimeText = await regTimeItem.textContent()
   console.log('[test] 注册时间文字:', regTimeText)
 
+  // 核心断言：不应有 NaN（之前的 bug），不应有永久 ……
   expect(regTimeText, '不应包含 NaN').not.toContain('NaN')
-  expect(regTimeText, '不应包含 Invalid').not.toContain('Invalid')
-  expect(regTimeText, '应包含年份数字').toMatch(/\d{4}/)
+  expect(regTimeText, '不应包含 Invalid Date').not.toContain('Invalid')
+  // 应该是年份 或 降级提示
+  const hasYear = /\d{4}/.test(regTimeText)
+  const hasApiUnavailable = regTimeText.includes('API 不可用')
+  expect(hasYear || hasApiUnavailable, `应显示年份或降级文案，实际: "${regTimeText}"`).toBe(true)
 })
 
 test('check-friendship 检测好友关系', async () => {

@@ -3,6 +3,9 @@ require('dotenv').config({ path: path.join(__dirname, '.env.local') })
 
 const EXTENSION_PATH = path.resolve(__dirname, '../../dist')
 
+// Windows 代理（Clash/V2Ray 等），WSL2 通过宿主 IP 访问
+const WINDOWS_PROXY = 'http://172.29.240.1:7897'
+
 async function launchWithExtension(playwright) {
   const context = await playwright.chromium.launchPersistentContext('', {
     headless: false,
@@ -11,6 +14,7 @@ async function launchWithExtension(playwright) {
       `--load-extension=${EXTENSION_PATH}`,
       '--no-sandbox',
       '--disable-dev-shm-usage',
+      `--proxy-server=${WINDOWS_PROXY}`,
     ],
   })
   return context

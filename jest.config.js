@@ -5,4 +5,5 @@ module.exports = {
     silent: true,
     webpackConfig: './build/webpack.config.js',
   },
+  testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/'],
 }
