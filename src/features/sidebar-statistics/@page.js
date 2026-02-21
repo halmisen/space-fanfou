@@ -7,21 +7,6 @@ import Tooltip from '@libs/Tooltip'
 import { isUserProfilePage, isLoggedInUserProfilePage } from '@libs/pageDetect'
 import preactRender from '@libs/preactRender'
 import formatDate from '@libs/formatDate'
-import jsonp from '@libs/jsonp'
-
-// 通过 JSONP 从 api.fanfou.com 获取用户 created_at（需要登录 cookie）
-async function fetchCreatedAtViaJSONP(userId) {
-  try {
-    const data = await jsonp('//api.fanfou.com/users/show.json', {
-      params: { id: userId },
-      timeout: 10000,
-    })
-    return data && data.created_at ? data.created_at : null
-  } catch {
-    return null
-  }
-}
-
 // 从 m.fanfou.com 抓取最早消息时间（仅对自己的页面有效，他人页面受移动站限制只显示近期内容）
 async function fetchOldestStatusDate(userId, lastPage, proxiedFetch) {
   for (let page = lastPage; page >= Math.max(1, lastPage - 2); page--) {
@@ -110,9 +95,16 @@ class SidebarStatistics extends Component {
       const lastPage = Math.ceil(userProfile.statuses_count / 30)
       const oldestDate = await fetchOldestStatusDate(userId, lastPage, proxiedFetch)
       if (oldestDate) userProfile.created_at = oldestDate
-    } else {
-      const createdAt = await fetchCreatedAtViaJSONP(userId)
-      if (createdAt) userProfile.created_at = createdAt
+    } else if (proxiedFetch) {
+      // 他人页面：用 proxiedFetch 调 api.fanfou.com（Background 带 cookie，可能认证成功）
+      const { error, responseJSON } = await proxiedFetch.get({
+        url: 'https://api.fanfou.com/users/show.json',
+        query: { id: userId },
+        responseType: 'json',
+      })
+      if (!error && responseJSON && responseJSON.created_at) {
+        userProfile.created_at = responseJSON.created_at
+      }
     }
 
     return userProfile
