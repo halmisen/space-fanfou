@@ -7,6 +7,20 @@ import Tooltip from '@libs/Tooltip'
 import { isUserProfilePage, isLoggedInUserProfilePage } from '@libs/pageDetect'
 import preactRender from '@libs/preactRender'
 import formatDate from '@libs/formatDate'
+import jsonp from '@libs/jsonp'
+
+// 通过 JSONP 从 api.fanfou.com 获取用户 created_at（需要登录 cookie）
+async function fetchCreatedAtViaJSONP(userId) {
+  try {
+    const data = await jsonp('//api.fanfou.com/users/show.json', {
+      params: { id: userId },
+      timeout: 10000,
+    })
+    return data && data.created_at ? data.created_at : null
+  } catch {
+    return null
+  }
+}
 
 // 从 m.fanfou.com 抓取最早消息时间（仅对自己的页面有效，他人页面受移动站限制只显示近期内容）
 async function fetchOldestStatusDate(userId, lastPage, proxiedFetch) {
@@ -91,11 +105,14 @@ class SidebarStatistics extends Component {
     // 3. 加锁状态：检查页面是否有私密账号标志
     userProfile.protected = select.exists('.locked, .private-icon, [class*="private"]')
 
-    // 4. 近似注册时间：仅对自己的页面抓取（m.fanfou.com 对他人页面只开放近期消息，无法获取最早记录）
+    // 4. 注册时间：自己页面用 m.fanfou.com 抓最早消息；他人页面尝试 JSONP
     if (isLoggedInUserProfilePage() && userProfile.statuses_count > 0 && proxiedFetch) {
       const lastPage = Math.ceil(userProfile.statuses_count / 30)
       const oldestDate = await fetchOldestStatusDate(userId, lastPage, proxiedFetch)
       if (oldestDate) userProfile.created_at = oldestDate
+    } else {
+      const createdAt = await fetchCreatedAtViaJSONP(userId)
+      if (createdAt) userProfile.created_at = createdAt
     }
 
     return userProfile
@@ -116,7 +133,7 @@ class SidebarStatistics extends Component {
         registerDurationText: '—',
         statusFrequencyText: `共 ${userProfile.statuses_count || 0} 条消息`,
         statusFrequencyProgress: 0,
-        influenceIndexText: `${userProfile.followers_count || 0} 位关注者`,
+        influenceIndexText: '—',
         influenceIndexProgress: 0,
         backgroundImageUrl: isBackgroundImageDisabled ? null : bgImage,
       })
