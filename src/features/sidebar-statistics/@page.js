@@ -43,6 +43,10 @@ class SidebarStatistics extends Component {
   async componentWillMount() {
     try {
       const userProfile = await this.fetchUserProfileData()
+      if (userProfile.oauthNotConfigured && !userProfile.created_at) {
+        this.setState({ registerDateText: '需要 OAuth 授权' })
+        return
+      }
       this.processData(userProfile)
     } catch (error) {
       this.setState({ registerDateText: '暂无数据' })
@@ -65,7 +69,7 @@ class SidebarStatistics extends Component {
 
   async fetchUserProfileData() {
     const userId = this.getUserId()
-    const { proxiedFetch } = this.props
+    const { proxiedFetch, fanfouOAuth } = this.props
     const userProfile = {}
 
     // 1. 从页面 DOM 提取各项计数
@@ -90,20 +94,26 @@ class SidebarStatistics extends Component {
     // 3. 加锁状态：检查页面是否有私密账号标志
     userProfile.protected = select.exists('.locked, .private-icon, [class*="private"]')
 
-    // 4. 注册时间：自己页面用 m.fanfou.com 抓最早消息；他人页面尝试 JSONP
+    // 4. 注册时间：自己页面用 m.fanfou.com 抓最早消息；他人页面用 OAuth API
     if (isLoggedInUserProfilePage() && userProfile.statuses_count > 0 && proxiedFetch) {
       const lastPage = Math.ceil(userProfile.statuses_count / 30)
       const oldestDate = await fetchOldestStatusDate(userId, lastPage, proxiedFetch)
       if (oldestDate) userProfile.created_at = oldestDate
-    } else if (proxiedFetch) {
-      // 他人页面：用 proxiedFetch 调 api.fanfou.com（Background 带 cookie，可能认证成功）
-      const { error, responseJSON } = await proxiedFetch.get({
+    }
+
+    // 所有页面（含自己）：尝试用 OAuth 获取精确注册时间
+    if (fanfouOAuth) {
+      const { error, responseJSON } = await fanfouOAuth.request({
         url: 'https://api.fanfou.com/users/show.json',
         query: { id: userId },
         responseType: 'json',
       })
       if (!error && responseJSON && responseJSON.created_at) {
         userProfile.created_at = responseJSON.created_at
+        userProfile.oauthSuccess = true
+      } else if (error) {
+        const needsAuth = typeof error === 'string' && (error.includes('授权') || error.includes('OAuth 功能未启用'))
+        if (needsAuth) userProfile.oauthNotConfigured = true
       }
     }
 
@@ -260,7 +270,7 @@ class StatisticItem extends Component {
 
 export default context => {
   const { elementCollection, requireModules } = context
-  const { proxiedFetch } = requireModules([ 'proxiedFetch' ])
+  const { proxiedFetch, fanfouOAuth } = requireModules([ 'proxiedFetch', 'fanfouOAuth' ])
 
   let unmount
 
@@ -274,7 +284,7 @@ export default context => {
     waitReady: () => elementCollection.ready('stabs'),
 
     onLoad() {
-      unmount = preactRender(<SidebarStatistics proxiedFetch={proxiedFetch} />, rendered => {
+      unmount = preactRender(<SidebarStatistics proxiedFetch={proxiedFetch} fanfouOAuth={fanfouOAuth} />, rendered => {
         elementCollection.get('stabs').after(rendered)
       })
     },
