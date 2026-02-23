@@ -10,6 +10,9 @@
   ],
   "scripts": {
     "test": "npm run lint && npm run unit",
+    "test:e2e": "playwright test tests/playwright",
+    "test:e2e:smoke": "playwright test tests/playwright/extension-smoke.spec.ts --reporter=line",
+    "test:e2e:auth": "playwright test tests/playwright/fanfou-auth-and-features.spec.ts --reporter=line",
     "lint": "npm run lint:js && npm run lint:css",
     "lint:js": "eslint .",
     "lint:css": "stylelint '**/*.(less|css)'",
@@ -87,6 +90,7 @@
     "@babel/plugin-proposal-optional-chaining": "^7.2.0",
     "@babel/plugin-transform-modules-commonjs": "^7.4.3",
     "@babel/plugin-transform-react-jsx": "^7.1.6",
+    "@playwright/test": "^1.58.2",
     "approot": "^0.2.1",
     "autoprefixer": "^9.5.1",
     "babel-eslint": "^10.0.1",
