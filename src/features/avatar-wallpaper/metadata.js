@@ -8,12 +8,12 @@ export const options = {
   },
 
   opacity: {
-    defaultValue: 0.15,
-    label: `壁纸透明度 ${CONTROL_PLACEHOLDER} (0.05 - 0.5)`,
+    defaultValue: 0.22,
+    label: `壁纸透明度 ${CONTROL_PLACEHOLDER} (0.08 - 0.65)`,
     controlOptions: {
-      step: 0.05,
-      min: 0.05,
-      max: 0.5,
+      step: 0.02,
+      min: 0.08,
+      max: 0.65,
     },
   },
   fetchIntervalDays: {

@@ -7,10 +7,10 @@ const STORAGE_AREA = 'local'
 const CACHE_SCHEMA_VERSION = 1
 const CONTAINER_ID = 'sf-avatar-wallpaper'
 const BODY_CLASSNAME = 'sf-avatar-wallpaper-enabled'
-const DEFAULT_OPACITY = 0.15
+const DEFAULT_OPACITY = 0.22
 const DEFAULT_REFRESH_INTERVAL_DAYS = 7
 const TILE_SIZE = 48
-const TILE_GAP = 8
+const TILE_GAP = 2
 const MAX_TILE_COUNT = 420
 const MAX_API_PAGES = 8
 const MAX_WEB_PAGES = 8
@@ -318,8 +318,8 @@ export default context => {
   async function initWallpaper() {
     activeOpacity = clamp(
       toNumberOrDefault(readOptionValue('opacity'), DEFAULT_OPACITY),
-      0.05,
-      0.5,
+      0.08,
+      0.65,
     )
     activeAvatarUrls = await ensureAvatarCache()
 
