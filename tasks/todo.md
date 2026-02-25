@@ -77,3 +77,23 @@
   - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
   - `npm run build`
 - 结果：通过
+
+## 10. Avatar Wallpaper 视觉优化（2026-02-25）
+- [x] 移除“为铺满而重复头像”的策略，优先每个头像只渲染一次
+- [x] 头像尺寸改为按总人数自适应（优先更大尺寸，解决“看起来太小”）
+- [x] 新增“蓝色背景方案”设置项（至少 5 种），支持页面实时切换
+- [x] 优化整体排版（居中、间距、阴影）提升美观度
+- [x] 运行 lint/build 验证并提交
+
+### 10.1 Review 结果（2026-02-25）
+- 关键改动：
+  - `avatar-wallpaper@page.js`
+    - 去除重复平铺逻辑，改为唯一头像优先渲染（最多 520）
+    - 新增按头像数量自适应尺寸（72/64/56/52/48）
+    - 新增 5 套蓝色背景预设（settings 可选）
+  - `avatar-wallpaper@page.less`
+    - 网格布局居中 + 间距与阴影优化，减少“头像太小”体感
+  - `metadata.js`
+    - 新增 `backgroundPreset` 选项
+- 验证：
+  - `eslint` / `stylelint` / `npm run build` 通过

@@ -16,6 +16,18 @@ export const options = {
       max: 0.65,
     },
   },
+
+  backgroundPreset: {
+    defaultValue: 2,
+    label: `蓝色背景方案 ${CONTROL_PLACEHOLDER} (1 - 5)`,
+    comment: '1 雾蓝 / 2 海盐蓝 / 3 深海蓝 / 4 天青蓝 / 5 夜幕蓝',
+    controlOptions: {
+      step: 1,
+      min: 1,
+      max: 5,
+    },
+  },
+
   fetchIntervalDays: {
     defaultValue: 7,
     label: `自动刷新缓存周期 ${CONTROL_PLACEHOLDER} 天`,

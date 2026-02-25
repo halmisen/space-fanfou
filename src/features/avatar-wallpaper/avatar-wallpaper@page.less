@@ -1,4 +1,7 @@
 #sf-avatar-wallpaper {
+  --sf-avatar-wallpaper-tile-size: 64px;
+  --sf-avatar-wallpaper-tile-gap: 6px;
+
   position: fixed;
   top: 0;
   right: 0;
@@ -6,27 +9,27 @@
   left: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(auto-fill, 50px);
-  grid-auto-rows: 50px;
-  justify-content: start;
-  align-content: start;
-  gap: 2px;
-  padding: 2px;
+  grid-template-columns: repeat(auto-fill, var(--sf-avatar-wallpaper-tile-size));
+  grid-auto-rows: var(--sf-avatar-wallpaper-tile-size);
+  justify-content: center;
+  align-content: center;
+  gap: var(--sf-avatar-wallpaper-tile-gap);
+  padding: 14px;
   overflow: hidden;
   pointer-events: none;
 }
 
 #sf-avatar-wallpaper .sf-avatar-wallpaper-tile {
-  width: 48px;
-  height: 48px;
+  width: var(--sf-avatar-wallpaper-tile-size);
+  height: var(--sf-avatar-wallpaper-tile-size);
   border-radius: 50%;
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  filter: grayscale(12%) saturate(96%);
+  filter: grayscale(8%) saturate(102%);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.38),
-    0 1px 3px rgba(0, 0, 0, 0.05);
+    0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 2px 8px rgba(43, 76, 120, 0.12);
 }
 
 body.sf-avatar-wallpaper-enabled {

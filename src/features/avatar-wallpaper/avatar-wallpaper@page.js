@@ -8,13 +8,28 @@ const CACHE_SCHEMA_VERSION = 1
 const CONTAINER_ID = 'sf-avatar-wallpaper'
 const BODY_CLASSNAME = 'sf-avatar-wallpaper-enabled'
 const DEFAULT_OPACITY = 0.22
+const DEFAULT_BACKGROUND_PRESET = 2
 const DEFAULT_REFRESH_INTERVAL_DAYS = 7
-const TILE_SIZE = 48
-const TILE_GAP = 2
-const MAX_TILE_COUNT = 420
+const MAX_RENDER_AVATARS = 520
 const MAX_API_PAGES = 8
 const MAX_WEB_PAGES = 8
 const API_URL = 'https://api.fanfou.com/users/friends.json'
+const BACKGROUND_PRESETS = [ {
+  id: 1,
+  background: 'linear-gradient(140deg, #f3f8ff 0%, #e6f0ff 45%, #d8e7ff 100%)',
+}, {
+  id: 2,
+  background: 'linear-gradient(140deg, #edf5ff 0%, #dbe9ff 45%, #c8ddff 100%)',
+}, {
+  id: 3,
+  background: 'linear-gradient(145deg, #dde9ff 0%, #c8dcff 45%, #b1cfff 100%)',
+}, {
+  id: 4,
+  background: 'linear-gradient(140deg, #e6f7ff 0%, #d5eeff 45%, #bee3ff 100%)',
+}, {
+  id: 5,
+  background: 'linear-gradient(145deg, #d9e7ff 0%, #bfd6ff 45%, #9fc2ff 100%)',
+} ]
 
 function toNumberOrDefault(value, defaultValue) {
   return Number.isFinite(value)
@@ -197,26 +212,41 @@ function writeCache(storage, avatars) {
   }, STORAGE_AREA)
 }
 
+function resolveLayout(avatarCount) {
+  if (avatarCount <= 110) {
+    return { tileSize: 72, tileGap: 8 }
+  }
+
+  if (avatarCount <= 180) {
+    return { tileSize: 64, tileGap: 6 }
+  }
+
+  if (avatarCount <= 280) {
+    return { tileSize: 56, tileGap: 5 }
+  }
+
+  if (avatarCount <= 420) {
+    return { tileSize: 52, tileGap: 4 }
+  }
+
+  return { tileSize: 48, tileGap: 3 }
+}
+
+function getBackgroundPreset(rawPresetId) {
+  const presetId = clamp(
+    toNumberOrDefault(rawPresetId, DEFAULT_BACKGROUND_PRESET),
+    1,
+    BACKGROUND_PRESETS.length,
+  )
+
+  return BACKGROUND_PRESETS[presetId - 1]
+}
+
 function getRenderAvatarUrls(avatars) {
   if (!avatars.length) return []
 
-  const tileStep = TILE_SIZE + TILE_GAP
-  const columnCount = Math.ceil(window.innerWidth / tileStep) + 1
-  const rowCount = Math.ceil(window.innerHeight / tileStep) + 1
-  const requiredCount = clamp(columnCount * rowCount, 48, MAX_TILE_COUNT)
-  const shuffled = shuffle([ ...avatars ])
-
-  if (shuffled.length >= requiredCount) {
-    return shuffled.slice(0, requiredCount)
-  }
-
-  const result = []
-
-  for (let i = 0; i < requiredCount; i++) {
-    result.push(shuffled[i % shuffled.length])
-  }
-
-  return result
+  return shuffle([ ...avatars ])
+    .slice(0, MAX_RENDER_AVATARS)
 }
 
 function removeWallpaperContainer() {
@@ -229,19 +259,27 @@ function removeWallpaperContainer() {
   document.body.classList.remove(BODY_CLASSNAME)
 }
 
-function renderWallpaper({ avatars, opacity }) {
+function renderWallpaper({
+  avatars,
+  opacity,
+  backgroundPreset,
+}) {
   removeWallpaperContainer()
 
   if (!avatars.length) return
 
   const renderUrls = getRenderAvatarUrls(avatars)
   if (!renderUrls.length) return
+  const { tileSize, tileGap } = resolveLayout(renderUrls.length)
 
   const container = document.createElement('div')
   const fragment = document.createDocumentFragment()
 
   container.id = CONTAINER_ID
   container.style.opacity = String(opacity)
+  container.style.background = backgroundPreset.background
+  container.style.setProperty('--sf-avatar-wallpaper-tile-size', `${tileSize}px`)
+  container.style.setProperty('--sf-avatar-wallpaper-tile-gap', `${tileGap}px`)
 
   for (const url of renderUrls) {
     const tile = document.createElement('span')
@@ -268,6 +306,7 @@ export default context => {
 
   let activeAvatarUrls = []
   let activeOpacity = DEFAULT_OPACITY
+  let activeBackgroundPreset = BACKGROUND_PRESETS[DEFAULT_BACKGROUND_PRESET - 1]
   let resizeTimer = null
 
   async function fetchAvatarUrls() {
@@ -312,6 +351,7 @@ export default context => {
     renderWallpaper({
       avatars: activeAvatarUrls,
       opacity: activeOpacity,
+      backgroundPreset: activeBackgroundPreset,
     })
   }
 
@@ -320,6 +360,9 @@ export default context => {
       toNumberOrDefault(readOptionValue('opacity'), DEFAULT_OPACITY),
       0.08,
       0.65,
+    )
+    activeBackgroundPreset = getBackgroundPreset(
+      readOptionValue('backgroundPreset'),
     )
     activeAvatarUrls = await ensureAvatarCache()
 
