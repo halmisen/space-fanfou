@@ -1,0 +1,35 @@
+#sf-avatar-wallpaper {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 56px);
+  grid-auto-rows: 56px;
+  justify-content: start;
+  align-content: start;
+  gap: 8px;
+  padding: 8px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#sf-avatar-wallpaper .sf-avatar-wallpaper-tile {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: grayscale(24%) saturate(88%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+body.sf-avatar-wallpaper-enabled #container {
+  position: relative;
+  z-index: 1;
+}

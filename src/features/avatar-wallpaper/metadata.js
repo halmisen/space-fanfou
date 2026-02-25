@@ -4,7 +4,9 @@ export const options = {
   _: {
     defaultValue: true,
     label: '显示关注者头像壁纸',
+    comment: '自动读取关注用户头像并拼接为背景壁纸。首次加载可能需要几秒钟。',
   },
+
   opacity: {
     defaultValue: 0.15,
     label: `壁纸透明度 ${CONTROL_PLACEHOLDER} (0.05 - 0.5)`,

@@ -52,3 +52,28 @@
 - [ ] 修复 `src/content/environment/bridge.js`，增加 try-catch 避免 SW 休眠导致的 postMessage 报错造成死锁
 - [ ] 修复 `src/features/check-friendship/@page.js` 的 `hasChecked` 重置逻辑，确保成功和失败路径均能清空改标志以便下一次点击正常工作
 - [x] 跑通端到端测试验证以上两处修复
+
+## 9. 接手 avatar-wallpaper 分支修复与 MVP 落地（2026-02-25）
+- [x] 接手并评估 `feat/avatar-wallpaper`（保留分支历史，不重建 worktree）
+- [x] 定位设置页白屏高风险点并修复（移除不符合 subfeature 约定的 background/content 实现）
+- [x] 重构为单一 `@page` 方案：自动抓取关注头像 + 本地缓存 + 网格壁纸渲染
+- [x] 保留设置项（开关/透明度/刷新周期）并维持 settings 接入
+- [x] 运行 lint/build 验证并通过
+- [ ] 继续扩展：支持手动触发刷新与导出壁纸图片
+
+### 9.1 Review 结果（2026-02-25）
+- 关键改动：
+  - 删除：
+    - `src/features/avatar-wallpaper/apply-wallpaper@content.js`
+    - `src/features/avatar-wallpaper/fetch-avatars@background.js`
+    - `src/features/avatar-wallpaper/avatar-wallpaper.css`
+  - 新增：
+    - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - 更新：
+    - `src/features/avatar-wallpaper/metadata.js`
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js src/settings/getTabDefs.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：通过

@@ -19,3 +19,11 @@
 - **踩坑点**：MV3 下 Service Worker 会在约 30 秒无活动后面临休眠或被杀死的风险。如果页面在此时通过 `postMessage` 向后台发送请求，`messaging.postMessage` 极有可能会直接抛出一个 rejected Promise（因 port 断开）。在原本的 `bridge.js` 转发通道设计中，由于 `await bridge.postMessageToBackground(message)` 周围未作 `try-catch` 处理，这会导致代码抛出异常并提前退出当前 Eventhandler，不再执行向页面脚本回调发回响应的动作，最终导致发起请求侧陷入死锁。
 - **关联影响**：在 `check-friendship` 等深度依赖基于 Promise 的 `bridge` 响应通道的组件里，请求永远都没有 resolve 或 reject 返回，UI 操作会卡制在"处理中"的锁定死区，用户无法重试。而如果在页面逻辑的同步流里，成功处理后也没有妥善复位 `hasChecked = false`，同样会导致状态紊乱。
 - **复盘与规则**：在涉及到 MV3 的扩展应用环境跨层桥接（比如从 Content Bridge 代理转发给 Background）时，必须严格防御底层管道断裂报错。**任何底层通信的 `await` 调用必须由 `try-catch` 包裹，确保即使通信崩溃，也能把明确定义的错误体转发回前台，以释放所有挂起的 Deferred 锁。** 而对待像 `hasChecked` 这类的行为阻拦标记，应确保其在成功与失败路径的末端都能统一收敛释放。
+
+## 5. Feature 子脚本导出约定破坏会连锁触发设置页白屏 (Subfeature Export Contract)
+- **踩坑点**：在 `src/features/*` 中新增了 `@background.js` 但没有 `default export` subfeature 工厂（或者导出形态不符合框架期望），会导致 background 在遍历 feature 并实例化 subfeature 时抛错。
+- **关联影响**：background 初始化失败后，settings 页拿不到 `GET_OPTION_DEFS` 响应，最终表现为设置页白屏或空渲染。
+- **复盘与规则**：
+  - 任何 `*@background.js` / `*@content.js` / `*@page.js` 必须 `export default context => ({ ...lifecycle })`。
+  - 如果当前功能只需要页面逻辑，优先使用单一 `@page` 实现，避免不必要的跨层脚本。
+  - 一旦出现 settings 白屏，先检查新增 feature 的子脚本导出签名是否满足框架约定，而不是先怀疑 metadata。
