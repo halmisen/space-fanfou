@@ -97,3 +97,9 @@
     - 新增 `backgroundPreset` 选项
 - 验证：
   - `eslint` / `stylelint` / `npm run build` 通过
+
+### 10.2 用户反馈后增强（2026-02-25）
+- [x] 新增选项：`prioritizeFavoriteFanfouers`（有爱饭友优先）
+- [x] 读取 `favorite-fanfouers/friendsData`，将星标头像排在渲染序列前部
+- [x] 头像墙布局改为“左右两栏”，中间留白不再放头像
+- [x] 验证（eslint/stylelint/build）通过

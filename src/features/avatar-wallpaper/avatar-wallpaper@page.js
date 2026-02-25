@@ -4,11 +4,16 @@ import { isTimelinePage } from '@libs/pageDetect'
 
 const STORAGE_KEY_CACHE = 'avatar-wallpaper/cache'
 const STORAGE_AREA = 'local'
+const STORAGE_KEY_FAVORITE_FANFOUERS = 'favorite-fanfouers/friendsData'
+const STORAGE_AREA_FAVORITE_FANFOUERS = 'sync'
 const CACHE_SCHEMA_VERSION = 1
 const CONTAINER_ID = 'sf-avatar-wallpaper'
+const PANE_LEFT_ID = 'sf-avatar-wallpaper-pane-left'
+const PANE_RIGHT_ID = 'sf-avatar-wallpaper-pane-right'
 const BODY_CLASSNAME = 'sf-avatar-wallpaper-enabled'
 const DEFAULT_OPACITY = 0.22
 const DEFAULT_BACKGROUND_PRESET = 2
+const DEFAULT_PRIORITIZE_FAVORITES = true
 const DEFAULT_REFRESH_INTERVAL_DAYS = 7
 const MAX_RENDER_AVATARS = 520
 const MAX_API_PAGES = 8
@@ -69,15 +74,31 @@ function normalizeAvatarUrl(url = '') {
   return normalized
 }
 
+function createAvatarKey(url = '') {
+  const normalized = normalizeAvatarUrl(url)
+  if (!normalized) return ''
+
+  try {
+    const parsedUrl = new URL(normalized, window.location.origin)
+    return `${parsedUrl.hostname}${parsedUrl.pathname}`.toLowerCase()
+  } catch {
+    return normalized.split('?')[0].toLowerCase()
+  }
+}
+
 function dedupeAndNormalize(urls) {
-  const set = new Set()
+  const map = new Map()
 
   for (const url of urls) {
     const normalized = normalizeAvatarUrl(url)
-    if (normalized) set.add(normalized)
+    const key = createAvatarKey(normalized)
+
+    if (key) {
+      map.set(key, normalized)
+    }
   }
 
-  return [ ...set ]
+  return [ ...map.values() ]
 }
 
 function parseAvatarUrlsFromHtmlDocument(document) {
@@ -212,6 +233,18 @@ function writeCache(storage, avatars) {
   }, STORAGE_AREA)
 }
 
+async function readFavoriteAvatarUrls(storage) {
+  const rawData = await storage.read(
+    STORAGE_KEY_FAVORITE_FANFOUERS,
+    STORAGE_AREA_FAVORITE_FANFOUERS,
+  )
+  const favoriteAvatarUrls = Array.isArray(rawData)
+    ? rawData.map(item => item?.avatarUrl)
+    : []
+
+  return dedupeAndNormalize(favoriteAvatarUrls)
+}
+
 function resolveLayout(avatarCount) {
   if (avatarCount <= 110) {
     return { tileSize: 72, tileGap: 8 }
@@ -242,11 +275,97 @@ function getBackgroundPreset(rawPresetId) {
   return BACKGROUND_PRESETS[presetId - 1]
 }
 
-function getRenderAvatarUrls(avatars) {
+function prioritizeFavorites({ avatars, favoriteAvatarUrls }) {
+  if (!favoriteAvatarUrls.length) return avatars
+
+  const avatarByKey = new Map(
+    avatars.map(url => [ createAvatarKey(url), url ]),
+  )
+  const favoriteKeys = favoriteAvatarUrls.map(createAvatarKey)
+  const used = new Set()
+  const favoritesFirst = []
+
+  for (const key of favoriteKeys) {
+    const avatarUrl = avatarByKey.get(key)
+    if (!avatarUrl || used.has(key)) continue
+
+    favoritesFirst.push(avatarUrl)
+    used.add(key)
+  }
+
+  const rest = avatars.filter(url => !used.has(createAvatarKey(url)))
+
+  return [ ...favoritesFirst, ...rest ]
+}
+
+function getRenderAvatarUrls({
+  avatars,
+  favoriteAvatarUrls,
+  prioritizeFavoritesFirst,
+}) {
   if (!avatars.length) return []
 
-  return shuffle([ ...avatars ])
+  const maybePrioritized = prioritizeFavoritesFirst
+    ? prioritizeFavorites({ avatars, favoriteAvatarUrls })
+    : avatars
+
+  return shuffle([ ...maybePrioritized ])
     .slice(0, MAX_RENDER_AVATARS)
+}
+
+function resolveSidePaneWidths() {
+  const centerContainer = document.querySelector('#container')
+
+  if (!centerContainer) {
+    const fallbackWidth = Math.floor(window.innerWidth * 0.22)
+    return {
+      left: fallbackWidth,
+      right: fallbackWidth,
+    }
+  }
+
+  const rect = centerContainer.getBoundingClientRect()
+  const left = Math.max(0, Math.floor(rect.left) - 10)
+  const right = Math.max(0, Math.floor(window.innerWidth - rect.right) - 10)
+
+  return { left, right }
+}
+
+function getPaneCapacity({ paneWidth, tileSize, tileGap }) {
+  if (paneWidth < tileSize) return 0
+
+  const columns = Math.max(1, Math.floor((paneWidth + tileGap) / (tileSize + tileGap)))
+  const rows = Math.max(1, Math.floor((window.innerHeight + tileGap) / (tileSize + tileGap)))
+
+  return columns * rows
+}
+
+function splitUrlsForPanes({ urls, leftCapacity, rightCapacity }) {
+  const leftUrls = []
+  const rightUrls = []
+
+  for (const url of urls) {
+    const shouldPushLeft = leftUrls.length <= rightUrls.length
+
+    if (shouldPushLeft && leftUrls.length < leftCapacity) {
+      leftUrls.push(url)
+      continue
+    }
+
+    if (rightUrls.length < rightCapacity) {
+      rightUrls.push(url)
+      continue
+    }
+
+    if (leftUrls.length < leftCapacity) {
+      leftUrls.push(url)
+      continue
+    }
+
+    break
+  }
+
+  return { leftUrls, rightUrls }
 }
 
 function removeWallpaperContainer() {
@@ -257,38 +376,79 @@ function removeWallpaperContainer() {
   }
 
   document.body.classList.remove(BODY_CLASSNAME)
+  document.body.style.removeProperty('--sf-avatar-wallpaper-bg')
 }
 
 function renderWallpaper({
   avatars,
+  favoriteAvatarUrls,
   opacity,
   backgroundPreset,
+  prioritizeFavoritesFirst,
 }) {
   removeWallpaperContainer()
 
   if (!avatars.length) return
 
-  const renderUrls = getRenderAvatarUrls(avatars)
+  const renderUrls = getRenderAvatarUrls({
+    avatars,
+    favoriteAvatarUrls,
+    prioritizeFavoritesFirst,
+  })
   if (!renderUrls.length) return
   const { tileSize, tileGap } = resolveLayout(renderUrls.length)
+  const { left: leftPaneWidth, right: rightPaneWidth } = resolveSidePaneWidths()
+  const leftPaneCapacity = getPaneCapacity({
+    paneWidth: leftPaneWidth,
+    tileSize,
+    tileGap,
+  })
+  const rightPaneCapacity = getPaneCapacity({
+    paneWidth: rightPaneWidth,
+    tileSize,
+    tileGap,
+  })
+  const { leftUrls, rightUrls } = splitUrlsForPanes({
+    urls: renderUrls,
+    leftCapacity: leftPaneCapacity,
+    rightCapacity: rightPaneCapacity,
+  })
+
+  if (!leftUrls.length && !rightUrls.length) return
 
   const container = document.createElement('div')
-  const fragment = document.createDocumentFragment()
+  const leftPane = document.createElement('div')
+  const rightPane = document.createElement('div')
 
   container.id = CONTAINER_ID
   container.style.opacity = String(opacity)
-  container.style.background = backgroundPreset.background
   container.style.setProperty('--sf-avatar-wallpaper-tile-size', `${tileSize}px`)
   container.style.setProperty('--sf-avatar-wallpaper-tile-gap', `${tileGap}px`)
+  leftPane.id = PANE_LEFT_ID
+  leftPane.className = 'sf-avatar-wallpaper-pane'
+  leftPane.style.width = `${leftPaneWidth}px`
+  rightPane.id = PANE_RIGHT_ID
+  rightPane.className = 'sf-avatar-wallpaper-pane'
+  rightPane.style.width = `${rightPaneWidth}px`
 
-  for (const url of renderUrls) {
-    const tile = document.createElement('span')
-    tile.className = 'sf-avatar-wallpaper-tile'
-    tile.style.backgroundImage = `url("${url}")`
-    fragment.append(tile)
+  for (const [ pane, urls ] of [
+    [ leftPane, leftUrls ],
+    [ rightPane, rightUrls ],
+  ]) {
+    const fragment = document.createDocumentFragment()
+
+    for (const url of urls) {
+      const tile = document.createElement('span')
+      tile.className = 'sf-avatar-wallpaper-tile'
+      tile.style.backgroundImage = `url("${url}")`
+      fragment.append(tile)
+    }
+
+    pane.append(fragment)
   }
 
-  container.append(fragment)
+  container.append(leftPane, rightPane)
+  document.body.style.setProperty('--sf-avatar-wallpaper-bg', backgroundPreset.background)
   document.body.prepend(container)
   document.body.classList.add(BODY_CLASSNAME)
 }
@@ -305,8 +465,10 @@ export default context => {
   } = requireModules([ 'storage', 'fanfouOAuth', 'proxiedFetch' ])
 
   let activeAvatarUrls = []
+  let activeFavoriteAvatarUrls = []
   let activeOpacity = DEFAULT_OPACITY
   let activeBackgroundPreset = BACKGROUND_PRESETS[DEFAULT_BACKGROUND_PRESET - 1]
+  let activePrioritizeFavoritesFirst = DEFAULT_PRIORITIZE_FAVORITES
   let resizeTimer = null
 
   async function fetchAvatarUrls() {
@@ -350,8 +512,10 @@ export default context => {
   function renderUsingActiveState() {
     renderWallpaper({
       avatars: activeAvatarUrls,
+      favoriteAvatarUrls: activeFavoriteAvatarUrls,
       opacity: activeOpacity,
       backgroundPreset: activeBackgroundPreset,
+      prioritizeFavoritesFirst: activePrioritizeFavoritesFirst,
     })
   }
 
@@ -364,7 +528,9 @@ export default context => {
     activeBackgroundPreset = getBackgroundPreset(
       readOptionValue('backgroundPreset'),
     )
+    activePrioritizeFavoritesFirst = readOptionValue('prioritizeFavoriteFanfouers') !== false
     activeAvatarUrls = await ensureAvatarCache()
+    activeFavoriteAvatarUrls = await readFavoriteAvatarUrls(storage)
 
     renderUsingActiveState()
   }

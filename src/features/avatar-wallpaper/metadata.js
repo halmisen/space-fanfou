@@ -28,6 +28,12 @@ export const options = {
     },
   },
 
+  prioritizeFavoriteFanfouers: {
+    defaultValue: true,
+    label: '优先显示有爱饭友（星标）',
+    comment: '开启后，有爱饭友中的头像会优先出现在两侧头像墙前排。',
+  },
+
   fetchIntervalDays: {
     defaultValue: 7,
     label: `自动刷新缓存周期 ${CONTROL_PLACEHOLDER} 天`,
