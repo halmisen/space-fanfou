@@ -103,3 +103,11 @@
 - [x] 读取 `favorite-fanfouers/friendsData`，将星标头像排在渲染序列前部
 - [x] 头像墙布局改为“左右两栏”，中间留白不再放头像
 - [x] 验证（eslint/stylelint/build）通过
+
+### 10.3 用户反馈后增强（2026-02-25）
+- [x] 扩展蓝色背景预设：5 -> 10
+- [x] 新增选项：`fillBlueOnlyInGaps`（蓝色仅填充头像间隙）
+- [x] 壁纸渲染支持两种模式：
+  - 间隙填充模式：蓝色只出现在头像空隙，不覆盖头像
+  - 全局背景模式：蓝色铺在页面背景层
+- [x] 验证（eslint/stylelint/build）通过

@@ -14,6 +14,7 @@ const BODY_CLASSNAME = 'sf-avatar-wallpaper-enabled'
 const DEFAULT_OPACITY = 0.22
 const DEFAULT_BACKGROUND_PRESET = 2
 const DEFAULT_PRIORITIZE_FAVORITES = true
+const DEFAULT_FILL_GAPS_ONLY = true
 const DEFAULT_REFRESH_INTERVAL_DAYS = 7
 const MAX_RENDER_AVATARS = 520
 const MAX_API_PAGES = 8
@@ -34,6 +35,21 @@ const BACKGROUND_PRESETS = [ {
 }, {
   id: 5,
   background: 'linear-gradient(145deg, #d9e7ff 0%, #bfd6ff 45%, #9fc2ff 100%)',
+}, {
+  id: 6,
+  background: 'linear-gradient(145deg, #eef7ff 0%, #def0ff 42%, #c9e5ff 100%)',
+}, {
+  id: 7,
+  background: 'linear-gradient(145deg, #d8e7ff 0%, #bcd6ff 45%, #9cbfff 100%)',
+}, {
+  id: 8,
+  background: 'linear-gradient(145deg, #d4e0f7 0%, #b7c9e8 45%, #95afd8 100%)',
+}, {
+  id: 9,
+  background: 'linear-gradient(145deg, #f5f9ff 0%, #e8f1ff 45%, #d5e5ff 100%)',
+}, {
+  id: 10,
+  background: 'linear-gradient(145deg, #cedcf7 0%, #afc3ed 42%, #8ea9e1 100%)',
 } ]
 
 function toNumberOrDefault(value, defaultValue) {
@@ -385,6 +401,7 @@ function renderWallpaper({
   opacity,
   backgroundPreset,
   prioritizeFavoritesFirst,
+  fillBlueOnlyInGaps,
 }) {
   removeWallpaperContainer()
 
@@ -421,9 +438,23 @@ function renderWallpaper({
   const rightPane = document.createElement('div')
 
   container.id = CONTAINER_ID
-  container.style.opacity = String(opacity)
+  container.style.opacity = fillBlueOnlyInGaps
+    ? '1'
+    : String(opacity)
   container.style.setProperty('--sf-avatar-wallpaper-tile-size', `${tileSize}px`)
   container.style.setProperty('--sf-avatar-wallpaper-tile-gap', `${tileGap}px`)
+  container.style.setProperty(
+    '--sf-avatar-wallpaper-pane-bg',
+    fillBlueOnlyInGaps
+      ? backgroundPreset.background
+      : 'transparent',
+  )
+  container.style.setProperty(
+    '--sf-avatar-wallpaper-pane-bg-opacity',
+    fillBlueOnlyInGaps
+      ? String(opacity)
+      : '0',
+  )
   leftPane.id = PANE_LEFT_ID
   leftPane.className = 'sf-avatar-wallpaper-pane'
   leftPane.style.width = `${leftPaneWidth}px`
@@ -448,7 +479,11 @@ function renderWallpaper({
   }
 
   container.append(leftPane, rightPane)
-  document.body.style.setProperty('--sf-avatar-wallpaper-bg', backgroundPreset.background)
+  if (fillBlueOnlyInGaps) {
+    document.body.style.removeProperty('--sf-avatar-wallpaper-bg')
+  } else {
+    document.body.style.setProperty('--sf-avatar-wallpaper-bg', backgroundPreset.background)
+  }
   document.body.prepend(container)
   document.body.classList.add(BODY_CLASSNAME)
 }
@@ -469,6 +504,7 @@ export default context => {
   let activeOpacity = DEFAULT_OPACITY
   let activeBackgroundPreset = BACKGROUND_PRESETS[DEFAULT_BACKGROUND_PRESET - 1]
   let activePrioritizeFavoritesFirst = DEFAULT_PRIORITIZE_FAVORITES
+  let activeFillBlueOnlyInGaps = DEFAULT_FILL_GAPS_ONLY
   let resizeTimer = null
 
   async function fetchAvatarUrls() {
@@ -516,6 +552,7 @@ export default context => {
       opacity: activeOpacity,
       backgroundPreset: activeBackgroundPreset,
       prioritizeFavoritesFirst: activePrioritizeFavoritesFirst,
+      fillBlueOnlyInGaps: activeFillBlueOnlyInGaps,
     })
   }
 
@@ -529,6 +566,7 @@ export default context => {
       readOptionValue('backgroundPreset'),
     )
     activePrioritizeFavoritesFirst = readOptionValue('prioritizeFavoriteFanfouers') !== false
+    activeFillBlueOnlyInGaps = readOptionValue('fillBlueOnlyInGaps') !== false
     activeAvatarUrls = await ensureAvatarCache()
     activeFavoriteAvatarUrls = await readFavoriteAvatarUrls(storage)
 

@@ -19,13 +19,19 @@ export const options = {
 
   backgroundPreset: {
     defaultValue: 2,
-    label: `蓝色背景方案 ${CONTROL_PLACEHOLDER} (1 - 5)`,
-    comment: '1 雾蓝 / 2 海盐蓝 / 3 深海蓝 / 4 天青蓝 / 5 夜幕蓝',
+    label: `蓝色背景方案 ${CONTROL_PLACEHOLDER} (1 - 10)`,
+    comment: '1 雾蓝 / 2 海盐蓝 / 3 深海蓝 / 4 天青蓝 / 5 夜幕蓝 / 6 冰川蓝 / 7 钴蓝 / 8 风暴蓝 / 9 晨雾蓝 / 10 星夜蓝',
     controlOptions: {
       step: 1,
       min: 1,
-      max: 5,
+      max: 10,
     },
+  },
+
+  fillBlueOnlyInGaps: {
+    defaultValue: true,
+    label: '蓝色仅填充头像间隙',
+    comment: '开启后蓝色只显示在头像之间的空隙，不覆盖头像本身。',
   },
 
   prioritizeFavoriteFanfouers: {
