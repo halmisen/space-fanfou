@@ -193,3 +193,16 @@
   - `cache-loader` 在增删 `src/features` 子目录后，因为 `index.js` 代码文件本身未变，错误地为 `importAll.macro` 服务了旧有的缓存。这导致近期增删的特性（如 `avatar-wallpaper` 或因清理而删除的文件）在 `production` 构建中丢失与残缺，继而在前端抛出 `Cannot read properties of undefined` 的白屏级 React 渲染崩溃。
   - **Fix:** 修改 `build/webpack.js.config.js`，在 `mode === 'production'` 生产构建时彻底弃用 `cache-loader`，确保每次 `build` 都根据最新的 FS 完全重评宏指令。
 - [x] **Verification:** 通过在内置 E2E 测试挂载 `pageerror` 监听验证排查，并最终跑通。白屏彻底解决。
+
+### Phase 2: Structural UI Rewrite (Tailwind Engine)
+> *Lessons from Phase 1: Progressive enhancement on ancient LESS layouts fails. We need a modern CSS framework to rebuild components from the ground up without destroying information density.*
+
+- [ ] **Step 1: Build System Modernization**
+  - Integrate PostCSS and Tailwind CSS into the existing Webpack 4 pipeline.
+  - Ensure Tailwind directives coexist with legacy LESS (so we can rewrite one component at a time without breaking everything else).
+- [ ] **Step 2: Component: Settings Page Rewrite**
+  - Create a new Preact component for the Settings Page, entirely utilizing Tailwind utility classes.
+  - Implement a dense, modern layout (e.g., Apple-style system preferences) that preserves 240px inputs but organizes them into elegant sections.
+- [ ] **Step 3: Component: Sidebar Statistics Rewrite**
+  - Rewrite `sidebar-statistics/@page.js` HTML logic to use Tailwind.
+  - Implement a high-density, modern vertical data display.

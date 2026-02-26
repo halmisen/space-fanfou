@@ -17,7 +17,9 @@
     "unit:dev": "jest --watch",
     "cleanup": "rimraf dist && mkdirp dist",
     "dev": "npm run cleanup && webpack --watch --mode development --config build/webpack.config.js",
-    "build": "npm run cleanup && webpack --mode production --config build/webpack.config.js",
+    "build": "npm run cleanup && webpack --mode production --config build/webpack.config.js && npm --prefix settings-next run build",
+    "build:settings-next": "npm --prefix settings-next run build",
+    "dev:settings-next": "npm --prefix settings-next run dev",
     "pack": "node build/pack.js",
     "release": "npm run build && npm run pack"
   },
