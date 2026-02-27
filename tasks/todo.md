@@ -46,3 +46,6 @@ Instead of structural overhauls, we will focus on **Non-Destructive Aesthetic Up
 ## 2026-02-27 PopupBox Upload Button Left-Alignment
 - Updated `misc@page.less` to apply `float: left` and remove custom background styling to the injected upload button.
 - The icon is now correctly rendered on the far left of the `#PopupBox` `.act` container, faithfully reproducing the native homepage behavior while retaining the script functionality.
+
+## 2026-02-27 PopupBox Upload Button Absolute Left-Alignment
+- Updated `misc@page.less` to apply `position: absolute; left: 18px; bottom: 16px;` to force the button into the bottom left corner.
