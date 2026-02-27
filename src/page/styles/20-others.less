@@ -1,20 +1,16 @@
 /* Screen */
 #columns {
   border-radius: 8px;
-  border: none !important;
-  box-shadow: var(--sf-shadow-md); /* Make the whole content block float above the background */
-  overflow: hidden; /* Ensure children don't bleed out of the rounded corners */
 }
 
 #main {
-  border: none !important;
-  background-color: var(--sf-bg-panel); /* Ensure it's opaque white */
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
 }
 
 #sidebar {
-  border: none !important;
-  border-left: 1px solid var(--sf-border) !important; /* Soften the internal divider between main and sidebar */
-  background-color: var(--sf-bg-panel); /* Solid color instead of translucent */
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 .sysmsg,
@@ -121,22 +117,22 @@
 #sharer textarea {
   padding: 4px;
   background: rgba(255, 255, 255, 0.75);
-  border: 1px solid var(--sf-border) !important;
+  border: 1px solid #bdbdbd !important;
   border-radius: 4px;
-  box-shadow: var(--sf-shadow-sm) !important;
+  box-shadow: none !important;
   resize: none;
   transition-property: background, height, border, box-shadow;
-  transition-duration: var(--sf-transition-fast);
+  transition-duration: 250ms;
 
   &:hover {
     background: rgba(255, 255, 255, 1);
-    border-color: var(--sf-text-muted) !important;
-    box-shadow: var(--sf-shadow-md) !important;
+    border-color: #9e9e9e !important;
+    box-shadow: 0 0 8px rgba(158, 158, 168, 0.1) inset !important;
   }
 
   &:focus {
-    border-color: var(--sf-accent) !important;
-    box-shadow: var(--sf-focus-ring) !important;
+    border-color: #2196f3 !important;
+    box-shadow: 0 0 8px rgba(33, 150, 243, 0.1) inset !important;
     outline: none;
   }
 
@@ -165,10 +161,10 @@
 }
 
 #PopupBox {
-  border: 1px solid var(--sf-border);
-  background: var(--sf-bg-panel);
-  border-radius: 8px;
-  box-shadow: var(--sf-shadow-md);
+  border: 3px solid rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
   z-index: 100 !important;
   animation: sf-fade-in 100ms;
 }
@@ -313,13 +309,8 @@
 
 #stream h3,
 #stream li {
-  border-bottom-color: var(--sf-border);
+  border-bottom-color: #eee;
   border-bottom-style: solid;
-  transition: background-color var(--sf-transition-fast);
-}
-
-#stream li:hover {
-  background-color: var(--sf-bg-body);
 }
 
 #stream li.light:not(.latest) {
@@ -697,7 +688,7 @@ p.pm-parent {
 }
 
 .tabs {
-  border-bottom: 1px solid var(--sf-border) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
 }
 
 .tabs li a {
@@ -707,19 +698,17 @@ p.pm-parent {
       #fff,
       #eee
     ) !important;
-  border: 1px solid var(--sf-border) !important;
-  border-bottom-color: var(--sf-border) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-bottom-color: rgba(0, 0, 0, 0.15) !important;
   padding: 3px 11px !important;
   margin-bottom: 1px !important;
-  color: var(--sf-text-muted) !important;
+  color: #666 !important;
   text-shadow: 0 1px 0 #fff;
-  transition: all var(--sf-transition-fast);
 }
 
 .tabs li.current a {
   background: none !important;
-  border-bottom-color: var(--sf-accent) !important;
-  color: var(--sf-accent) !important;
+  border-bottom-color: rgba(255, 255, 255, 1) !important;
   padding: 5px 12px !important;
 }
 
@@ -881,13 +870,12 @@ input.inlinebutton,
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
   text-decoration: none !important;
   white-space: nowrap;
-  border: 1px solid var(--sf-border) !important;
+  border: 1px solid #9a9a9a !important;
   border-radius: 3px;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    var(--sf-shadow-sm);
+    0 1px 0 rgba(0, 0, 0, 0.09);
   user-select: none;
-  transition: all var(--sf-transition-fast);
 }
 
 input.formbutton,
@@ -906,10 +894,10 @@ input.formbutton:hover,
 .post_act.friend-deny:hover,
 .post_act.follower-remove:hover,
 #setmobile input[type="submit"]:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    var(--sf-shadow-md);
-  border-color: var(--sf-text-muted) !important;
+  animation-name: sf-bl-blinking;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-duration: 1s;
 }
 
 .bl:focus,
@@ -922,8 +910,8 @@ input.formbutton:focus,
 .post_act.follower-remove:focus,
 #setmobile input[type="submit"]:focus {
   outline: none;
-  border-color: var(--sf-accent) !important;
-  box-shadow: var(--sf-focus-ring) !important;
+  border-color: rgba(83, 186, 237, 1) !important;
+  box-shadow: 0 0 8px rgba(83, 186, 237, 0.6);
 }
 
 a.bh {
@@ -945,21 +933,21 @@ a.bh {
   border-radius: 3px;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    var(--sf-shadow-sm);
+    0 1px 0 rgba(0, 0, 0, 0.09);
   user-select: none;
-  transition: all var(--sf-transition-fast);
 }
 
 a.bh:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.75) inset,
-    var(--sf-shadow-md);
+  animation-name: sf-bh-blinking;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-duration: 1s;
 }
 
 a.bh:focus {
   outline: none;
-  border-color: var(--sf-accent) !important;
-  box-shadow: var(--sf-focus-ring) !important;
+  border-color: rgba(83, 186, 237, 1) !important;
+  box-shadow: 0 0 8px rgba(83, 186, 237, 0.6);
 }
 
 select {
@@ -980,33 +968,37 @@ select:focus {
   height: 32px !important;
   padding: 0 !important;
   font-size: 14px !important;
-  font-weight: 500 !important; /* Slightly bolder for modern look */
-  color: var(--sf-text-main) !important;
+  font-weight: normal !important;
+  color: #333 !important;
   letter-spacing: 0 !important;
-  background: var(--sf-bg-panel) !important; /* Clean solid background instead of outdated gradient */
-  text-shadow: none; /* Remove text shadow */
+  background:
+    linear-gradient(
+      to top,
+      #ebebeb 0%,
+      #ececec 50%,
+      #f3f3f3 50%,
+      #fff 100%
+    ) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
   white-space: nowrap;
-  vertical-align: middle !important; /* Force baseline alignment with adjacent elements like upload */
-  border: 1px solid var(--sf-border) !important;
-  border-radius: 6px; /* Slightly rounder */
-  box-shadow: var(--sf-shadow-sm); /* Rely purely on simple modern dropshadow */
-  transition: all var(--sf-transition-fast);
+  border: 1px solid #9a9a9a !important;
+  border-radius: 5px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 1px 0 rgba(0, 0, 0, 0.09);
 
   &:hover {
-    box-shadow: var(--sf-shadow-md); /* Just elevate on hover */
-    border-color: var(--sf-accent) !important; /* Subtle tint on border */
-    background: var(--sf-bg-body) !important; /* Slight dim */
+    animation: sf-bl-blinking ease-in-out infinite 1s;
   }
 
   &:focus {
     outline: none;
-    border-color: var(--sf-accent) !important;
-    box-shadow: var(--sf-focus-ring) !important;
+    border-color: rgba(83, 186, 237, 1) !important;
+    box-shadow: 0 0 8px rgba(83, 186, 237, 0.6);
   }
 
   &[disabled] {
-    cursor: not-allowed;
-    opacity: 0.6;
+    cursor: default;
     animation: none;
   }
 }
@@ -1024,11 +1016,19 @@ select:focus {
 #settings input.formbutton:active,
 #setmobile input[type="submit"]:active,
 a.bh:active {
-  /* Flatten on click to give tactile feedback */
-  box-shadow: none !important;
-  transform: translateY(1px);
-  background: var(--sf-bg-body) !important;
-  border-color: var(--sf-border) !important;
+  border-color: #5a5caf #56578f #52536f !important;
+  background:
+    linear-gradient(
+      to top,
+      #d3f7fd 0%,
+      #87c5fb 50%,
+      #a1d1f9 50%,
+      #d4e9fc 100%
+    ) !important;
+  box-shadow:
+    0 999px 0 rgba(0, 115, 215, 0.3) inset,
+    0 1px 0 rgba(255, 255, 255, 1) inset,
+    0 1px 0 rgba(0, 0, 0, 0.09);
   animation-name: none;
 }
 
