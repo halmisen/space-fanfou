@@ -42,3 +42,7 @@ Instead of structural overhauls, we will focus on **Non-Destructive Aesthetic Up
 - Restored `ajax-form@page.js` injection logic so the upload button works.
 - Cleaned up `misc@page.less` by stripping the custom `.sf-popup-upload-wrapper` backgrounds, borders, and shadows.
 - The injected popup upload button now renders as a clean, transparent icon identical to the native homepage input style, fixing the baseline alignment.
+
+## 2026-02-27 PopupBox Upload Button Left-Alignment
+- Updated `misc@page.less` to apply `float: left` and remove custom background styling to the injected upload button.
+- The icon is now correctly rendered on the far left of the `#PopupBox` `.act` container, faithfully reproducing the native homepage behavior while retaining the script functionality.
