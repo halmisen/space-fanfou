@@ -37,3 +37,8 @@ Instead of structural overhauls, we will focus on **Non-Destructive Aesthetic Up
 [ ] Define a global minimalist color/shadow CSS variables block.
 [ ] Apply non-destructive styling to Settings Form Elements (Inputs, Checkboxes, Buttons).
 [ ] Apply non-destructive styling to Sidebar Typography and spacing.
+
+## 2026-02-27 PopupBox Upload Button Alignment
+- Restored `ajax-form@page.js` injection logic so the upload button works.
+- Cleaned up `misc@page.less` by stripping the custom `.sf-popup-upload-wrapper` backgrounds, borders, and shadows.
+- The injected popup upload button now renders as a clean, transparent icon identical to the native homepage input style, fixing the baseline alignment.
