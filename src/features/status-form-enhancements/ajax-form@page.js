@@ -16,14 +16,6 @@ const API_URL_UPLOAD_IMAGE = '/home/upload'
 const API_ACTION_PLAIN_MESSAGE = 'msg.post'
 const API_ACTION_UPLOAD_IMAGE = 'photo.upload'
 const URL_FANFOU_M_HOME = `${window.location.protocol}//m.fanfou.com/home`
-const POPUP_RETRY_INTERVAL_MS = 100
-const POPUP_RETRY_MAX_ATTEMPTS = 8
-const POPUP_TRIGGER_SELECTOR = [
-  '.reply',
-  'a[href*="/reply"]',
-  '.repost',
-  'a[href*="/repost"]',
-].join(', ')
 
 const ERROR_FAILED_REFRESHING_TOKEN = new Error('刷新 token 失败')
 
@@ -41,12 +33,6 @@ export default context => {
 
   // P0: State Management for Multiple Forms
   const submittingForms = new WeakMap()
-  let popupObserver = null
-  let popupBodyObserver = null
-  let observedPopupBox = null
-  let popupRetryTimer = null
-  let popupEnsureTimer = null
-  let popupEnsureRaf = 0
 
   // 简化基础的元素查找（由于我们要解耦多表单，这里只放依然全局唯一的核心）
   elementCollection.add({
@@ -345,173 +331,8 @@ export default context => {
     }
   }
 
-  function findSendButton(form) {
-    const selectors = [
-      'input[type="submit"]',
-      'button[type="submit"]',
-      'input.formbutton',
-      'button.formbutton',
-      'input[name="submit"]',
-      'button[name="submit"]',
-      '.formbutton',
-    ]
-
-    for (const selector of selectors) {
-      const button = form.querySelector(selector)
-
-      if (button) return button
-    }
-
-    return null
-  }
-
-  function hasPopupUploadButton(form) {
-    return !!form.querySelector('.sf-popup-upload-wrapper, .sf-upload-button')
-  }
-
-  function injectUploadButton(form) {
-    if (!form || hasPopupUploadButton(form)) return true
-
-    const sendButton = findSendButton(form)
-    if (!sendButton) return false
-
-    // Create the upload HTML mimicking the native #phupdate UI but avoiding ID conflicts
-    // Instead of id="upload-button", we use class="sf-upload-button"
-    const uploadWrapper = document.createElement('span')
-    uploadWrapper.className = 'upload-button-wrapper sf-popup-upload-wrapper'
-    uploadWrapper.innerHTML = `
-      <span class="sf-upload-button" data-form-source="popup" title="上传照片…"></span>
-      <input type="file" name="picture" class="upload-file" accept="image/jpeg,image/gif,image/png,image/x-ms-bmp">
-      <input type="hidden" name="photo_base64" value="">
-    `
-    // Ensure form has an explicit 'action' field, required by extractFormData
-    if (!form.elements.action) {
-      const actionInput = document.createElement('input')
-      actionInput.type = 'hidden'
-      actionInput.name = 'action'
-      actionInput.value = API_ACTION_PLAIN_MESSAGE
-      form.append(actionInput)
-    }
-
-    // Insert wrapper right before the Send button
-    sendButton.before(uploadWrapper)
-    form.dataset.sfUploadInjected = 'true'
-
-    return true
-  }
-
-  function ensurePopupUploadInjected() {
-    ensurePopupObserver()
-
-    const popupWrapper = document.getElementById('PopupBox')
-    if (!popupWrapper) return
-
-    const form = popupWrapper.querySelector('form')
-    if (!form || hasPopupUploadButton(form)) return
-
-    injectUploadButton(form)
-  }
-
-  function ensurePopupObserver() {
-    if (!popupObserver) return
-
-    const popupWrapper = document.getElementById('PopupBox')
-    if (!popupWrapper || popupWrapper === observedPopupBox) return
-
-    popupObserver.disconnect()
-    popupObserver.observe(popupWrapper, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: [ 'style', 'class' ],
-    })
-    observedPopupBox = popupWrapper
-  }
-
-  function clearPopupEnsureTasks() {
-    if (popupEnsureRaf) {
-      cancelAnimationFrame(popupEnsureRaf)
-      popupEnsureRaf = 0
-    }
-    if (popupEnsureTimer) {
-      clearTimeout(popupEnsureTimer)
-      popupEnsureTimer = null
-    }
-  }
-
-  function schedulePopupEnsure() {
-    ensurePopupUploadInjected()
-    clearPopupEnsureTasks()
-
-    popupEnsureRaf = requestAnimationFrame(() => {
-      popupEnsureRaf = 0
-      ensurePopupUploadInjected()
-    })
-    popupEnsureTimer = setTimeout(() => {
-      popupEnsureTimer = null
-      ensurePopupUploadInjected()
-    }, POPUP_RETRY_INTERVAL_MS)
-  }
-
-  function stopPopupRetryLoop() {
-    if (popupRetryTimer) {
-      clearInterval(popupRetryTimer)
-      popupRetryTimer = null
-    }
-  }
-
-  function startPopupRetryLoop() {
-    stopPopupRetryLoop()
-
-    let attempts = 0
-    popupRetryTimer = setInterval(() => {
-      attempts += 1
-      ensurePopupUploadInjected()
-
-      const popupForm = document.querySelector('#PopupBox form')
-      const isInjected = popupForm && hasPopupUploadButton(popupForm)
-
-      if (isInjected || attempts >= POPUP_RETRY_MAX_ATTEMPTS) {
-        stopPopupRetryLoop()
-      }
-    }, POPUP_RETRY_INTERVAL_MS)
-  }
-
-  function onPotentialPopupTriggerClick(event) {
-    const trigger = event.target?.closest?.(POPUP_TRIGGER_SELECTOR)
-    if (!trigger) return
-
-    schedulePopupEnsure()
-    startPopupRetryLoop()
-  }
 
   // P0 & P1 MutationObserver to dynamically inject #PopupBox Upload UI
-  function watchPopupBox() {
-    if (popupObserver || popupBodyObserver) return
-
-    popupObserver = new MutationObserver(() => {
-      schedulePopupEnsure()
-    })
-    popupBodyObserver = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        for (const addedNode of mutation.addedNodes) {
-          if (addedNode.nodeType !== Node.ELEMENT_NODE) continue
-
-          if (addedNode.id === 'PopupBox' || addedNode.querySelector?.('#PopupBox')) {
-            schedulePopupEnsure()
-            return
-          }
-        }
-      }
-    })
-
-    const popupWrapper = document.getElementById('PopupBox')
-    if (popupWrapper) ensurePopupObserver()
-    popupBodyObserver.observe(document.body, { childList: true, subtree: true })
-
-    // Fallback: If it's already on the page when script loads
-    schedulePopupEnsure()
-  }
 
   return {
     applyWhen: () => Promise.resolve(true),
@@ -522,10 +343,6 @@ export default context => {
       document.addEventListener('input', onTextareaChange, true)
       document.addEventListener('change', onTextareaChange, true)
       document.addEventListener('keyup', onTextareaKeyup, true)
-      document.addEventListener('click', onPotentialPopupTriggerClick, true)
-
-      // Start watching for PopupBox
-      watchPopupBox()
     },
 
     onUnload() {
@@ -533,19 +350,6 @@ export default context => {
       document.removeEventListener('input', onTextareaChange, true)
       document.removeEventListener('change', onTextareaChange, true)
       document.removeEventListener('keyup', onTextareaKeyup, true)
-      document.removeEventListener('click', onPotentialPopupTriggerClick, true)
-
-      if (popupObserver) {
-        popupObserver.disconnect()
-        popupObserver = null
-      }
-      observedPopupBox = null
-      if (popupBodyObserver) {
-        popupBodyObserver.disconnect()
-        popupBodyObserver = null
-      }
-      clearPopupEnsureTasks()
-      stopPopupRetryLoop()
     },
   }
 }
