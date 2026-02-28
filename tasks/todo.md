@@ -53,3 +53,4 @@ Instead of structural overhauls, we will focus on **Non-Destructive Aesthetic Up
 ## 2026-02-28 PopupBox Upload Button Robust Flex Layout
 - Replaced `position: absolute` with Flexbox on `#PopupBox .act`.
 - Used `margin-right: auto` on the upload wrapper to guarantee it always anchors to the far left without breaking the native form layout.
+- 2026-02-28 `PopupBox` upload button left alignment failed (Float, Absolute, Flexbox). Handing over layout debugging to Codex.
