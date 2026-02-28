@@ -65,12 +65,29 @@
 #PopupBox .act {
   display: flex;
   align-items: center;
-  justify-content: flex-end; /* By default, push Send button and counter to right */
+  width: 100%;
 }
 
 #PopupBox .sf-popup-upload-wrapper {
-  margin-right: auto; /* Pushes the upload icon to the far left, while the rest stays right */
-  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  margin: 0 auto 0 2px;
+  padding-right: 0;
+  flex: 0 0 auto;
+}
+
+#PopupBox .actpost {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+#PopupBox .actpost .loading {
+  margin-right: 6px;
+}
+
+#PopupBox .actpost .formbutton {
+  left: auto !important;
 }
 
 #sf-counter {

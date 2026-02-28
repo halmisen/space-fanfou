@@ -369,6 +369,17 @@ export default context => {
     return !!form.querySelector('.sf-popup-upload-wrapper, .sf-upload-button')
   }
 
+  function findPopupActionContainer(form) {
+    if (!form?.closest?.('#PopupBox')) return null
+
+    const actionRow = form.querySelector('.act')
+    const actionGroup = actionRow?.querySelector('.actpost')
+
+    if (!actionRow || !actionGroup || !actionRow.contains(actionGroup)) return null
+
+    return { actionRow, actionGroup }
+  }
+
   function injectUploadButton(form) {
     if (!form || hasPopupUploadButton(form)) return true
 
@@ -393,8 +404,14 @@ export default context => {
       form.append(actionInput)
     }
 
-    // Insert wrapper right before the Send button
-    sendButton.before(uploadWrapper)
+    const popupActionContainer = findPopupActionContainer(form)
+    if (popupActionContainer) {
+      popupActionContainer.actionGroup.before(uploadWrapper)
+    } else {
+      // Insert wrapper right before the Send button for the legacy inline forms
+      sendButton.before(uploadWrapper)
+    }
+
     form.dataset.sfUploadInjected = 'true'
 
     return true

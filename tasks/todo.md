@@ -54,3 +54,21 @@ Instead of structural overhauls, we will focus on **Non-Destructive Aesthetic Up
 - Replaced `position: absolute` with Flexbox on `#PopupBox .act`.
 - Used `margin-right: auto` on the upload wrapper to guarantee it always anchors to the far left without breaking the native form layout.
 - 2026-02-28 `PopupBox` upload button left alignment failed (Float, Absolute, Flexbox). Handing over layout debugging to Codex.
+
+## 2026-02-28 PopupBox Upload Button True Left Alignment (Codex)
+
+### Plan
+- [x] 1. 审查 `#PopupBox` 上传按钮的注入锚点、计数器插入点和全局样式冲突，确认为什么 `.act` 内对齐策略始终失效。
+- [x] 2. 改用更贴近原生 `#phupdate` 的 DOM 落点或结构包装，避免继续依赖会破坏旧布局的 `flex/absolute/float` 强推。
+- [x] 3. 收敛 `misc@page.less` 中只为 PopupBox 服务的覆盖，保留透明相机图标外观，同时确保发送按钮与计数器不被带偏。
+- [x] 4. 运行针对性校验（至少 `stylelint`，必要时补 `build`），并在本节记录结果与剩余风险。
+
+### Review / Results
+- 根因：上传按钮一直被插在 `sendButton.before(...)` 的同级按钮组里，真实约束容器更可能是 `.actpost`；因此对 `#PopupBox .act` 做 `float`、`absolute`、`flex` 都无法把它真正推到左边。
+- 变更：在 `src/features/status-form-enhancements/ajax-form@page.js` 为 PopupBox 增加专属落点，检测 `.act > .actpost` 后将 `.sf-popup-upload-wrapper` 插到 `.actpost` 前，而不是继续塞进发送按钮那组。
+- 变更：在 `src/features/status-form-enhancements/misc@page.less` 将 PopupBox 操作行改为“左侧上传按钮 + 右侧 actpost 按钮组”的匹配布局，并重置 `.actpost .formbutton` 的遗留 `left` 偏移，保留透明相机图标外观。
+- 验证：
+- `npx stylelint src/features/status-form-enhancements/misc@page.less` 通过（仅出现仓库既有 deprecation warning）。
+- `npx eslint src/features/status-form-enhancements/ajax-form@page.js` 通过。
+- `npm run build` 通过（退出码 `0`）。
+- 剩余风险：当前环境没有可复用的饭否登录 Cookie，未能在真实 `#PopupBox` 页面做 Playwright/手工视觉复验；建议在扩展热更新后实际打开回复弹窗确认图标已贴左下角。

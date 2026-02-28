@@ -42,9 +42,9 @@ function createMessageHandler(port) {
       const errMsg = `未知消息类型 「${message.action}」`
       log.error(errMsg)
       if (!isPortDisconnected(port)) {
-        port.postMessage({ 
-          senderId, 
-          message: { __isError: true, message: errMsg } 
+        port.postMessage({
+          senderId,
+          message: { __isError: true, message: errMsg },
         })
       }
     }
