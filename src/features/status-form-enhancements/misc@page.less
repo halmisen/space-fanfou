@@ -62,10 +62,15 @@
   vertical-align: middle;
 }
 
+#PopupBox .act {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* By default, push Send button and counter to right */
+}
+
 #PopupBox .sf-popup-upload-wrapper {
-  position: absolute;
-  left: 18px; /* Align precisely with the left edge of the textarea */
-  bottom: 16px; /* Align vertically with the send button */
+  margin-right: auto; /* Pushes the upload icon to the far left, while the rest stays right */
+  margin-left: 2px;
 }
 
 #sf-counter {

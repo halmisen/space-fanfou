@@ -49,3 +49,7 @@ Instead of structural overhauls, we will focus on **Non-Destructive Aesthetic Up
 
 ## 2026-02-27 PopupBox Upload Button Absolute Left-Alignment
 - Updated `misc@page.less` to apply `position: absolute; left: 18px; bottom: 16px;` to force the button into the bottom left corner.
+
+## 2026-02-28 PopupBox Upload Button Robust Flex Layout
+- Replaced `position: absolute` with Flexbox on `#PopupBox .act`.
+- Used `margin-right: auto` on the upload wrapper to guarantee it always anchors to the far left without breaking the native form layout.
