@@ -2,9 +2,9 @@ import { CONTROL_PLACEHOLDER } from '@constants'
 
 export const options = {
   _: {
-    defaultValue: true,
+    defaultValue: false,
     label: '显示关注者头像壁纸',
-    comment: '自动读取关注用户头像并拼接为背景壁纸。首次加载可能需要几秒钟。',
+    comment: '自动读取关注用户头像并拼接为背景壁纸。该功能默认关闭，可在此手动开启。',
   },
 
   opacity: {
@@ -38,6 +38,12 @@ export const options = {
     defaultValue: true,
     label: '优先显示有爱饭友（星标）',
     comment: '开启后，有爱饭友中的头像会优先出现在两侧头像墙前排。',
+  },
+
+  match3Mode: {
+    defaultValue: false,
+    label: '羊了个羊模式（实验）',
+    comment: '随机抽取 13 位关注用户作为元素；点击头像放入槽位，同一头像凑满 3 个自动消除。槽位满 7 个仍未消除则失败。',
   },
 
   fetchIntervalDays: {

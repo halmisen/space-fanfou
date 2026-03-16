@@ -111,3 +111,27 @@
   - 间隙填充模式：蓝色只出现在头像空隙，不覆盖头像
   - 全局背景模式：蓝色铺在页面背景层
 - [x] 验证（eslint/stylelint/build）通过
+
+### 10.4 同步 2026.2 并修复羊了个羊模式（2026-03-16）
+- [x] 将 `2026.2` 的最新更新合入 `feat/avatar-wallpaper`
+- [x] 以 `2026.2` 已有的 `match3Mode` 为基线继续修复，而不是在旧分支上另起一套模式
+- [x] 将羊了个羊模式的点击牌、槽位牌和飞行动画牌改为“麻将牌底 + 头像贴片”的矩形样式
+- [x] 保持普通头像墙模式不变，只修改 `match3Mode`
+- [x] 运行验证（eslint / stylelint / build）
+
+### 10.4 Review 结果（2026-03-16）
+- 关键改动：
+  - 合入 `2026.2` 后，恢复 `metadata.js` 中已有的 `match3Mode`（“羊了个羊模式（实验）”）入口
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - 新增 match3 牌面尺寸与头像贴片指标
+    - 将点击牌、槽位牌、飞行动画牌统一改为通过 `--sf-match3-avatar-image` 渲染矩形牌面
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+    - 将 match3 的牌堆、槽位与飞行动画从圆头像改为麻将牌风格矩形卡面
+    - 普通头像墙样式保持不变
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js babel.config.js build/webpack.js.config.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：
+  - 自动化验证通过
+  - 真实 Chrome / 饭否页面的人工视觉验收尚未在此 CLI 环境执行
