@@ -135,3 +135,135 @@
 - 结果：
   - 自动化验证通过
   - 真实 Chrome / 饭否页面的人工视觉验收尚未在此 CLI 环境执行
+
+### 10.5 羊了个羊规则表达优化（2026-03-16）
+- [x] 去掉数字/颜色提示，改为仅通过“相同头像”作为配对线索
+- [x] 强化 match3 模式中可点牌与被遮挡牌的视觉区分
+- [x] 保持消除逻辑不变，仅优化规则表达与交互理解
+- [x] 运行验证（eslint / stylelint / build）
+
+### 10.5 Review 结果（2026-03-16）
+- 关键改动：
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - 羊了个羊模式不再渲染类型数字徽章
+    - 点击牌、槽位牌、飞行动画牌都只保留头像本身作为配对线索
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+    - 移除按类型着色的 match3 边框与编号样式
+    - 强化 blocked 牌的压暗效果，突出可点牌 hover 态
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js babel.config.js build/webpack.js.config.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：
+  - 自动化验证通过
+  - 真实 Chrome / 饭否页面的人工视觉验收尚未在此 CLI 环境执行
+
+### 10.6 羊了个羊可读性增强（2026-03-16）
+- [x] 让“被遮挡牌”和“灰色但可点牌”的视觉区分不依赖头像内容本身
+- [x] 将剩余总牌数与槽位占用拆成更清晰的状态展示
+- [x] 保持现有三消规则不变，仅增强反馈表达
+- [x] 运行验证（eslint / stylelint / build）
+
+### 10.6 Review 结果（2026-03-16）
+- 关键改动：
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - 羊了个羊托盘状态拆成“剩余牌”与“槽位”两个独立状态块
+    - 保持三消规则不变，仅增强状态反馈表达
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+    - 给 blocked 牌增加独立遮挡层，避免灰头像被误判为不可点
+    - 强化可点牌亮边，托盘状态改为更高可见度的双标签
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js babel.config.js build/webpack.js.config.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：
+  - 自动化验证通过
+  - 真实 Chrome / 饭否页面的人工视觉验收尚未在此 CLI 环境执行
+
+### 10.7 更新分支项目状态文档（2026-03-16）
+- [x] 将 `docs/project-status.md` 从旧的 `2026.2 / 2b5e5a8` 状态刷新到当前分支现实
+- [x] 记录 `feat/avatar-wallpaper / 06fd403`、最近一轮羊了个羊改动方向、当前未提交文件与验证结果
+- [x] 为后续继续工作补一段“从文档恢复上下文”的起点说明
+
+### 10.7 Review 结果（2026-03-16）
+- 关键改动：
+  - `docs/project-status.md`
+    - 更新分支、HEAD、当前工作线与最近一轮羊了个羊模式进展
+    - 记录当前未提交文件、自动化验证状态与下一步人工验收建议
+- 验证：
+  - 文档更新基于当前 `git status --short --branch`、`git rev-parse --short HEAD` 与最近验证记录完成，无额外代码构建变更
+- 结果：
+  - 项目状态文档已可作为下次继续工作的入口
+
+### 10.8 羊了个羊传统布局补完（2026-03-18）
+- [x] 为“传统中置布局”补一个明确的“重开”入口
+- [x] 让传统布局按视口自动缩小牌面，避免窄屏下棋盘被裁切
+- [x] 微调传统布局 HUD 的小屏尺寸，保证托盘与顶角按钮仍可用
+- [x] 运行验证（eslint / stylelint / build）
+
+### 10.8 Review 结果（2026-03-18）
+- 关键改动：
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - 传统中置布局改为按视口动态选择牌尺寸，优先保证棋盘完整落入可视区
+    - 传统布局右上角增加独立“重开”按钮，复用现有 restart 逻辑形成完整闭环
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+    - 传统布局顶角按钮改为可并排/换行显示
+    - 调整传统布局托盘 slot 尺寸与小屏 padding，降低窄屏溢出风险
+  - `docs/project-status.md`
+    - 同步记录传统中置布局已落地、当前风险与下一步人工验收重点
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：
+  - 自动化验证通过
+  - 真实 Chrome / 饭否页面中的桌面/窄屏人工验收仍待执行
+
+### 10.9 羊了个羊传统布局重排（2026-03-18）
+- [x] 让传统布局的最小化状态在同标签页切换页面后保持
+- [x] 修正传统布局棋盘的中心对齐逻辑，避免二次偏移
+- [x] 将中心主牌阵改为“饭否”字形，并移除破坏中心感的散落独立牌堆
+- [x] 统一侧边牌堆/盲盒牌堆的堆叠方向表达
+- [x] 运行验证（eslint / stylelint / build）
+
+### 10.9 Review 结果（2026-03-18）
+- 关键改动：
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - 新增传统布局最小化状态的 `sessionStorage` 保持逻辑
+    - 传统主牌阵改为基于“饭否”字形采样生成，并缓存采样结果避免重复扫描
+    - 传统棋盘坐标改为先归一化再整体居中，修复视觉中心偏移
+    - 砍掉传统布局里分散的独立小牌堆，只保留更统一的左右牌堆与底部盲盒堆
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+    - 新增舞台背景“饭否”字样，强化字形主牌阵的视觉中心
+    - 传统主牌阵预览层进一步减弱，避免把字形轮廓糊脏
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：
+  - 自动化验证通过
+  - 真实 Chrome / 饭否页面中的最终视觉验收仍待执行
+
+### 10.10 羊了个羊传统字形修订（2026-03-18）
+- [x] 放弃系统字体采样，改用固定“饭否”字模控制传统主牌阵轮廓
+- [x] 降低中心覆盖层数量，优先保留字形可读性
+- [x] 拉大传统主牌阵横纵步距，并把左右牌堆再往外退一点
+- [x] 运行验证（eslint / build）
+
+### 10.10 Review 结果（2026-03-18）
+- 关键改动：
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.js`
+    - 传统主牌阵改为读取固定 10x20 `#` 字模，不再受浏览器字体渲染影响
+    - 传统主牌阵改成“顶层 36 张牌负责写字，下面两层只做支撑”的分层策略
+    - 托盘失败判定收紧到 `7/7` 满槽即结束，并为失败态挂上独立状态特效
+    - 传统字形的横纵步距和左右辅牌堆间距同步拉大，缓解“两团牌糊在一起”的问题
+  - `src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+    - 传统主牌阵的被遮挡支撑层改成近乎隐形，避免继续污染“饭否”顶层轮廓
+    - 失败态新增居中“游戏结束”字标和 tray / controls / stage 联动震动特效
+- 验证：
+  - `npx eslint src/features/avatar-wallpaper/avatar-wallpaper@page.js src/features/avatar-wallpaper/metadata.js`
+  - `npx stylelint src/features/avatar-wallpaper/avatar-wallpaper@page.less`
+  - `npm run build`
+- 结果：
+  - 自动化验证通过
+  - 真实 Chrome / 饭否页面中的最终视觉验收仍待执行

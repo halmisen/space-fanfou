@@ -52,3 +52,20 @@
 - **复盘与规则**：
   - 当用户要求“继续优化某个已有功能”时，先检查当前活跃主线/主工作树是否已经对该功能有更新，再决定是在旧分支上改还是先同步。
   - 如果主线上已经有同名功能入口（如设置项、实验模式、按钮），应以那套最新实现为基线修复，而不是并行造第二套。
+
+## 10. 交互状态不能依赖素材内容本身传达 (State vs. Content)
+- **踩坑点**：在羊了个羊模式里，有些头像本身就是灰色或低饱和素材，结果即使牌是可点击的，也会被误看成“被遮挡/不能点”。
+- **复盘与规则**：
+  - “可操作 / 不可操作 / 被遮挡”这类状态必须通过独立于素材内容的 UI 信号表达，比如遮罩、亮边、浮起、状态条，而不是指望用户从图片内容自行判断。
+  - 对游戏/互动式界面，关键资源计数（如剩余牌数）要单独高可见展示，不应只混在一句小文案里。
+
+## 11. WSL 下接管 Windows Chrome 要区分“装上技能”和“连到浏览器” (WSL-to-Windows CDP Reality)
+- **踩坑点**：在 WSL / Linux 会话里安装 `chrome-cdp-skill` 后，直觉上会以为 `127.0.0.1:9222` 就能直接通到 Windows Chrome；但实际这个 Linux 回环地址和 Windows 本地回环不是一回事，`curl http://127.0.0.1:9222` 在 WSL 里可能直接失败。
+- **关联影响**：
+  - 技能装到 `~/.codex/skills` 只是“本地可见”，不等于当前 Linux `node` 环境就能驱动 Windows 那份 Chrome。
+  - 本机 Linux `node` 版本也可能不满足技能要求（这次 WSL 里是 `v20`，Windows 里是 `node.exe v23`）。
+  - 直接让 Windows `node.exe` 跑 `\\\\wsl.localhost\\...\\cdp.mjs` 这种 UNC 路径时，模块解析可能翻车；复制到 `C:\\Users\\<user>\\AppData\\Local\\...` 之类的 Windows 本地目录更稳。
+- **复盘与规则**：
+  - 先在 WSL 里安装技能，再分别验证 Linux 侧和 Windows 侧的调试端口与 Node 版本，不要默认它们共享同一个运行时。
+  - 需要真正接管 Windows Chrome 时，优先用 Windows 的 `node.exe` 执行 skill 脚本，并把脚本放到 Windows 本地路径。
+  - `list` 能拿到标签页，不代表具体 tab 已可控；第一次对某个 tab 做 `shot/snap/click` 等附着操作时，往往还要在 Chrome 里单独点一次 “Allow debugging”。
