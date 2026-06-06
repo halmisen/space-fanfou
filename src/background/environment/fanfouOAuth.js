@@ -55,7 +55,7 @@ async function persistTokens(tokens) {
     try {
       await storage.delete(TOKEN_STORAGE_KEY, 'local')
     } catch (error) {
-      log.warn('[SpaceFanfou] 删除 OAuth token 时出错（可忽略）', error)
+      log.warn('删除 OAuth token 时出错（可忽略）', error)
     }
   }
 }

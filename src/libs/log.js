@@ -21,6 +21,10 @@ export default {
     log(1, console.log, ...message)
   },
 
+  warn(...message) {
+    log(1, console.warn, ...message)
+  },
+
   error(...message) {
     log(2, console.error, ...message)
   },

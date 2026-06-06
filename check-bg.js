@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 const path = require('path')
-const { chromium } = require('playwright');
+const { chromium } = require('@playwright/test');
 
 (async () => {
   const extensionPath = path.resolve(__dirname, 'dist')
