@@ -22,8 +22,7 @@
     "run_at": "document_start"
   } ],
   "action": {
-    "default_title": "太空饭否",
-    "default_popup": "settings.html"
+    "default_title": "打开饭否"
   },
   "options_page": "settings.html",
   "permissions": [ "tabs", "notifications", "contextMenus", "storage", "offscreen", "scripting", "alarms", "identity" ],

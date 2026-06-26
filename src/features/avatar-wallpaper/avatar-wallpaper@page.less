@@ -395,9 +395,9 @@
   right: 10px;
   bottom: 10px;
   z-index: 4;
-  width: min(320px, calc(50vw - 36px));
+  width: min(360px, calc(50vw - 36px));
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   pointer-events: auto;
 }
@@ -458,10 +458,10 @@
 #sf-avatar-wallpaper.sf-avatar-wallpaper-match3-traditional .sf-match3-stage-hud .sf-match3-controls {
   position: static;
   width: 100%;
-  max-width: 420px;
+  max-width: 500px;
   flex: 0 0 auto;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
   transform: none;
 }
 
@@ -520,6 +520,101 @@
   color: rgba(50, 79, 118, 0.92);
   background: rgba(255, 255, 255, 0.62);
   box-shadow: inset 0 0 0 1px rgba(145, 179, 219, 0.28);
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-records-panel {
+  position: absolute;
+  right: 10px;
+  bottom: 58px;
+  z-index: 5;
+  width: min(360px, calc(50vw - 36px));
+  max-height: min(480px, calc(100vh - 120px));
+  display: none;
+  padding: 14px 16px 16px;
+  overflow: auto;
+  border-radius: 18px;
+  color: rgba(30, 58, 96, 0.96);
+  background: linear-gradient(180deg, rgba(248, 252, 255, 0.97), rgba(225, 238, 253, 0.94));
+  box-shadow:
+    0 12px 26px rgba(24, 56, 99, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.86);
+  pointer-events: auto;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-records-panel.is-visible {
+  display: block;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-records-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-records-panel section + section {
+  margin-top: 14px;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-records-panel h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(63, 91, 129, 0.9);
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-list li {
+  margin: 0 0 7px;
+  padding-left: 2px;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-height: 24px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-avatar-record-row {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.82),
+    0 2px 6px rgba(35, 73, 123, 0.16);
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-count {
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-align: center;
+  color: rgba(24, 74, 48, 0.96);
+  background: rgba(224, 245, 230, 0.9);
+}
+
+#sf-avatar-wallpaper.sf-avatar-wallpaper-match3 .sf-match3-record-empty {
+  color: rgba(76, 101, 134, 0.68);
 }
 
 #sf-avatar-wallpaper.sf-avatar-wallpaper-match3-traditional .sf-match3-stage-hud .sf-match3-tray-status {
@@ -888,8 +983,8 @@
   }
 
   #sf-avatar-wallpaper.sf-avatar-wallpaper-match3-traditional .sf-match3-stage-hud .sf-match3-controls {
-    max-width: 360px;
-    gap: 10px;
+    max-width: 420px;
+    gap: 8px;
   }
 }
 

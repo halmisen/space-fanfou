@@ -3,6 +3,7 @@ import getLoggedInUserId from '@libs/getLoggedInUserId'
 import { isTimelinePage, isStatusPage } from '@libs/pageDetect'
 
 const STORAGE_KEY_CACHE = 'avatar-wallpaper/cache'
+const STORAGE_KEY_MATCH3_RECORDS = 'avatar-wallpaper/match3Records'
 const STORAGE_AREA = 'local'
 const STORAGE_KEY_FAVORITE_FANFOUERS = 'favorite-fanfouers/friendsData'
 const STORAGE_AREA_FAVORITE_FANFOUERS = 'sync'
@@ -11,7 +12,9 @@ const STORAGE_AREA_AUTOCOMPLETE_FRIENDS_LIST = 'session'
 const STORAGE_KEY_MATCH3_TRADITIONAL_MINIMIZED = 'avatar-wallpaper/match3TraditionalMinimized'
 // Bump the cache schema so existing installs refetch avatar data after
 // merging the avatar-wallpaper branch into the main worktree.
-const CACHE_SCHEMA_VERSION = 2
+const CACHE_SCHEMA_VERSION = 3
+const MATCH3_RECORDS_SCHEMA_VERSION = 1
+const MATCH3_RECORDS_LIMIT = 10
 const CONTAINER_ID = 'sf-avatar-wallpaper'
 const PANE_LEFT_ID = 'sf-avatar-wallpaper-pane-left'
 const PANE_RIGHT_ID = 'sf-avatar-wallpaper-pane-right'
@@ -367,6 +370,66 @@ function dedupeAndNormalize(urls) {
   return [ ...map.values() ]
 }
 
+function normalizeAvatarUser(input) {
+  if (!input) return null
+
+  if (typeof input === 'string') {
+    const avatarUrl = normalizeAvatarUrl(input)
+    const avatarKey = createAvatarKey(avatarUrl)
+
+    return avatarKey
+      ? {
+        userId: '',
+        displayName: '',
+        avatarUrl,
+        avatarKey,
+      }
+      : null
+  }
+
+  const avatarUrl = normalizeAvatarUrl(
+    input.avatarUrl ||
+    input.profile_image_url ||
+    input.photo_url ||
+    input.url ||
+    '',
+  )
+  const avatarKey = createAvatarKey(avatarUrl)
+  if (!avatarKey) return null
+
+  const userId = input.userId || input.id || input.screen_name || ''
+  const displayName = input.displayName || input.nickname || input.name || input.screen_name || userId || ''
+
+  return {
+    userId: String(userId || ''),
+    displayName: String(displayName || ''),
+    avatarUrl,
+    avatarKey,
+  }
+}
+
+function dedupeAndNormalizeAvatarUsers(items) {
+  const map = new Map()
+
+  for (const item of items || []) {
+    const avatarUser = normalizeAvatarUser(item)
+
+    if (avatarUser) {
+      map.set(avatarUser.avatarKey, avatarUser)
+    }
+  }
+
+  return [ ...map.values() ]
+}
+
+function avatarUsersToUrls(avatarUsers) {
+  return dedupeAndNormalize(
+    (avatarUsers || [])
+      .map(avatarUser => avatarUser.avatarUrl)
+      .filter(Boolean),
+  )
+}
+
 function readTraditionalMatch3MinimizedState() {
   try {
     return sessionStorage.getItem(STORAGE_KEY_MATCH3_TRADITIONAL_MINIMIZED) === '1'
@@ -386,18 +449,37 @@ function writeTraditionalMatch3MinimizedState(minimized) {
   }
 }
 
-function parseAvatarUrlsFromHtmlDocument(document) {
+function parseAvatarUsersFromHtmlDocument(document) {
   const images = document.querySelectorAll([
     '#stream li .avatar img',
     '#friends li .avatar img',
     '#friends li img',
     '.users li .avatar img',
   ].join(', '))
-  const urls = [ ...images ].map(image => (
-    image.getAttribute('src') || image.getAttribute('data-src') || ''
-  ))
+  const avatarUsers = [ ...images ].map(image => {
+    const avatarUrl = image.getAttribute('src') || image.getAttribute('data-src') || ''
+    const profileLink = image.closest('a[href^="/"], a[href^="http://fanfou.com/"], a[href^="https://fanfou.com/"]')
+    let userId = ''
 
-  return dedupeAndNormalize(urls)
+    if (profileLink) {
+      try {
+        const url = new URL(profileLink.href, window.location.origin)
+        const [ pathUserId ] = url.pathname.replace(/^\/+/, '').split('/')
+
+        userId = pathUserId || ''
+      } catch {
+        userId = ''
+      }
+    }
+
+    return {
+      userId,
+      displayName: image.getAttribute('alt') || image.getAttribute('title') || userId,
+      avatarUrl,
+    }
+  })
+
+  return dedupeAndNormalizeAvatarUsers(avatarUsers)
 }
 
 function buildPageUrlCandidates() {
@@ -430,9 +512,9 @@ async function fetchHtml(proxiedFetch, url) {
   return responseText
 }
 
-async function fetchAvatarUrlsFromWebPages(proxiedFetch) {
+async function fetchAvatarUsersFromWebPages(proxiedFetch) {
   for (const baseUrl of buildPageUrlCandidates()) {
-    const avatars = []
+    const avatarUsers = []
 
     for (let page = 1; page <= MAX_WEB_PAGES; page++) {
       const pageUrl = createPageUrl(baseUrl, page)
@@ -440,31 +522,31 @@ async function fetchAvatarUrlsFromWebPages(proxiedFetch) {
 
       if (!html) {
         if (page === 1) {
-          avatars.length = 0
+          avatarUsers.length = 0
         }
         break
       }
 
       const document = parseHTML(html)
-      const pageAvatarUrls = parseAvatarUrlsFromHtmlDocument(document)
+      const pageAvatarUsers = parseAvatarUsersFromHtmlDocument(document)
 
-      if (!pageAvatarUrls.length) {
+      if (!pageAvatarUsers.length) {
         break
       }
 
-      avatars.push(...pageAvatarUrls)
+      avatarUsers.push(...pageAvatarUsers)
     }
 
-    if (avatars.length) {
-      return dedupeAndNormalize(avatars)
+    if (avatarUsers.length) {
+      return dedupeAndNormalizeAvatarUsers(avatarUsers)
     }
   }
 
   return []
 }
 
-async function fetchAvatarUrlsFromApi(fanfouOAuth) {
-  const avatars = []
+async function fetchAvatarUsersFromApi(fanfouOAuth) {
+  const avatarUsers = []
 
   for (let page = 1; page <= MAX_API_PAGES; page++) {
     const { error, responseJSON } = await fanfouOAuth.request({
@@ -484,16 +566,14 @@ async function fetchAvatarUrlsFromApi(fanfouOAuth) {
       break
     }
 
-    for (const user of responseJSON) {
-      avatars.push(user?.profile_image_url)
-    }
+    avatarUsers.push(...responseJSON)
 
     if (responseJSON.length < API_PAGE_SIZE) {
       break
     }
   }
 
-  return dedupeAndNormalize(avatars)
+  return dedupeAndNormalizeAvatarUsers(avatarUsers)
 }
 
 function isCacheFresh(cache, refreshIntervalDays) {
@@ -510,11 +590,14 @@ function readCache(storage) {
   return storage.read(STORAGE_KEY_CACHE, STORAGE_AREA)
 }
 
-function writeCache(storage, avatars) {
+function writeCache(storage, avatarUsers) {
+  const normalizedAvatarUsers = dedupeAndNormalizeAvatarUsers(avatarUsers)
+
   return storage.write(STORAGE_KEY_CACHE, {
     version: CACHE_SCHEMA_VERSION,
     updatedAt: Date.now(),
-    avatars,
+    avatars: avatarUsersToUrls(normalizedAvatarUsers),
+    avatarUsers: normalizedAvatarUsers,
   }, STORAGE_AREA)
 }
 
@@ -534,36 +617,157 @@ function getAutocompleteFriendsListStorageKey() {
   return `${STORAGE_KEY_AUTOCOMPLETE_FRIENDS_LIST}/${getLoggedInUserId()}`
 }
 
-function normalizeAvatarUrlsFromFriendsList(friendsList) {
+function normalizeAvatarUsersFromFriendsList(friendsList) {
   if (!Array.isArray(friendsList)) return []
 
-  return dedupeAndNormalize(
-    friendsList
-      .map(item => item?.photo_url || item?.avatarUrl || item?.profile_image_url || '')
-      .filter(Boolean),
-  )
+  return dedupeAndNormalizeAvatarUsers(friendsList)
 }
 
-async function readAvatarUrlsFromAutocompleteCache(storage) {
+async function readAvatarUsersFromAutocompleteCache(storage) {
   const cachedValue = await storage.read(
     getAutocompleteFriendsListStorageKey(),
     STORAGE_AREA_AUTOCOMPLETE_FRIENDS_LIST,
   ) || {}
 
-  return normalizeAvatarUrlsFromFriendsList(cachedValue.friendsList)
+  return normalizeAvatarUsersFromFriendsList(cachedValue.friendsList)
 }
 
-async function fetchAvatarUrlsFromAutocompleteEndpoint() {
+async function fetchAvatarUsersFromAutocompleteEndpoint() {
   try {
     const response = await fetch('/home.ac_friends')
     if (!response.ok) return []
 
     const responseJSON = await response.json()
 
-    return normalizeAvatarUrlsFromFriendsList(responseJSON)
+    return normalizeAvatarUsersFromFriendsList(responseJSON)
   } catch {
     return []
   }
+}
+
+function createEmptyMatch3Records() {
+  return {
+    version: MATCH3_RECORDS_SCHEMA_VERSION,
+    fastestClears: [],
+    avatarClears: [],
+  }
+}
+
+function normalizeFastestClearRecord(record) {
+  const durationMs = Number(record?.durationMs)
+
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return null
+
+  return {
+    durationMs,
+    moveCount: Math.max(0, Number(record?.moveCount) || 0),
+    completedAt: Number(record?.completedAt) || Date.now(),
+  }
+}
+
+function normalizeAvatarClearRecord(record) {
+  const count = Number(record?.count)
+  const avatarUser = normalizeAvatarUser(record)
+
+  if (!avatarUser || !Number.isFinite(count) || count <= 0) return null
+
+  return {
+    userId: avatarUser.userId,
+    displayName: avatarUser.displayName,
+    avatarUrl: avatarUser.avatarUrl,
+    avatarKey: avatarUser.avatarKey,
+    count,
+  }
+}
+
+function normalizeMatch3Records(records) {
+  const emptyRecords = createEmptyMatch3Records()
+
+  if (!records || typeof records !== 'object') return emptyRecords
+
+  return {
+    version: MATCH3_RECORDS_SCHEMA_VERSION,
+    fastestClears: (records.fastestClears || [])
+      .map(normalizeFastestClearRecord)
+      .filter(Boolean)
+      .sort((left, right) => left.durationMs - right.durationMs)
+      .slice(0, MATCH3_RECORDS_LIMIT),
+    avatarClears: (records.avatarClears || [])
+      .map(normalizeAvatarClearRecord)
+      .filter(Boolean)
+      .sort((left, right) => right.count - left.count)
+      .slice(0, MATCH3_RECORDS_LIMIT),
+  }
+}
+
+async function readMatch3Records(storage) {
+  return normalizeMatch3Records(
+    await storage.read(STORAGE_KEY_MATCH3_RECORDS, STORAGE_AREA),
+  )
+}
+
+function writeMatch3Records(storage, records) {
+  return storage.write(
+    STORAGE_KEY_MATCH3_RECORDS,
+    normalizeMatch3Records(records),
+    STORAGE_AREA,
+  )
+}
+
+function mergeAvatarClearRecords(existingRecords, clearedAvatarStats) {
+  const recordByKey = new Map()
+
+  for (const record of existingRecords) {
+    recordByKey.set(record.avatarKey, { ...record })
+  }
+
+  for (const [ avatarKey, entry ] of clearedAvatarStats.entries()) {
+    const avatarUser = normalizeAvatarUser(entry)
+    if (!avatarUser) continue
+
+    const existingRecord = recordByKey.get(avatarKey)
+    const nextCount = (existingRecord?.count || 0) + Math.max(0, Number(entry.count) || 0)
+
+    recordByKey.set(avatarKey, {
+      userId: avatarUser.userId,
+      displayName: avatarUser.displayName,
+      avatarUrl: avatarUser.avatarUrl,
+      avatarKey,
+      count: nextCount,
+    })
+  }
+
+  return [ ...recordByKey.values() ]
+    .sort((left, right) => right.count - left.count)
+    .slice(0, MATCH3_RECORDS_LIMIT)
+}
+
+async function addMatch3ClearRecord(storage, {
+  durationMs,
+  moveCount,
+  clearedAvatarStats,
+}) {
+  const records = await readMatch3Records(storage)
+  const fastestClears = [
+    ...records.fastestClears,
+    {
+      durationMs,
+      moveCount,
+      completedAt: Date.now(),
+    },
+  ]
+    .map(normalizeFastestClearRecord)
+    .filter(Boolean)
+    .sort((left, right) => left.durationMs - right.durationMs)
+    .slice(0, MATCH3_RECORDS_LIMIT)
+
+  await writeMatch3Records(storage, {
+    ...records,
+    fastestClears,
+    avatarClears: mergeAvatarClearRecords(records.avatarClears, clearedAvatarStats),
+  })
+
+  return readMatch3Records(storage)
 }
 
 function resolveLayout(avatarCount) {
@@ -659,6 +863,23 @@ function getRenderAvatarUrls({
 
   return shuffle([ ...avatars ])
     .slice(0, MAX_RENDER_AVATARS)
+}
+
+function getRenderAvatarUsers({
+  avatarUsers,
+  renderUrls,
+}) {
+  const avatarUserByKey = new Map(
+    dedupeAndNormalizeAvatarUsers(avatarUsers)
+      .map(avatarUser => [ avatarUser.avatarKey, avatarUser ]),
+  )
+
+  return renderUrls
+    .map(url => (
+      avatarUserByKey.get(createAvatarKey(url))
+      || normalizeAvatarUser(url)
+    ))
+    .filter(Boolean)
 }
 
 function resolveSidePaneWidths() {
@@ -1659,25 +1880,28 @@ function resolveSheepTripleGroupCounts({
 
 function createSheepTileDeck({
   urls,
+  avatarUsers,
   targetTripleGroupCounts = SHEEP_FIXED_TRIPLE_GROUP_COUNTS,
 }) {
-  const uniqueUrls = dedupeAndNormalize(urls)
+  const uniqueAvatarUsers = avatarUsers
+    ? dedupeAndNormalizeAvatarUsers(avatarUsers)
+    : dedupeAndNormalizeAvatarUsers(urls)
   const tripleGroupCounts = resolveSheepTripleGroupCounts({
-    uniqueAvatarCount: uniqueUrls.length,
+    uniqueAvatarCount: uniqueAvatarUsers.length,
     targetTripleGroupCounts,
   })
   if (!tripleGroupCounts.length) return []
 
-  const typeUrls = shuffle([ ...uniqueUrls ])
+  const typeAvatarUsers = shuffle([ ...uniqueAvatarUsers ])
     .slice(0, tripleGroupCounts.length)
-  if (!typeUrls.length) return []
+  if (!typeAvatarUsers.length) return []
 
   const tiles = []
   let tileSerial = 0
 
   tripleGroupCounts.forEach((tripleGroupCount, typeIndex) => {
-    const typeUrl = typeUrls[typeIndex]
-    if (!typeUrl) return
+    const typeAvatarUser = typeAvatarUsers[typeIndex]
+    if (!typeAvatarUser) return
 
     for (let tripleIndex = 0; tripleIndex < tripleGroupCount; tripleIndex++) {
       for (let copy = 0; copy < 3; copy++) {
@@ -1687,7 +1911,11 @@ function createSheepTileDeck({
           typeIndex,
           typeLabel: String(typeIndex + 1),
           typeClass: `sf-match3-type-${typeIndex + 1}`,
-          url: typeUrl,
+          userId: typeAvatarUser.userId,
+          displayName: typeAvatarUser.displayName,
+          avatarUrl: typeAvatarUser.avatarUrl,
+          avatarKey: typeAvatarUser.avatarKey,
+          url: typeAvatarUser.avatarUrl,
         })
       }
     }
@@ -2038,6 +2266,9 @@ function createSheepGameState({
     remainingTiles,
     status: SHEEP_STATUS_PLAYING,
     autoShuffleNotice: '',
+    startedAt: Date.now(),
+    moveCount: 0,
+    clearedAvatarStats: new Map(),
   }
 }
 
@@ -2082,6 +2313,9 @@ function cloneSheepStateForSimulation(state) {
     remainingTiles: state.remainingTiles,
     status: state.status,
     autoShuffleNotice: '',
+    startedAt: state.startedAt,
+    moveCount: state.moveCount,
+    clearedAvatarStats: new Map(state.clearedAvatarStats),
   }
 
   rebuildSheepStateMaps(clonedState)
@@ -2097,6 +2331,9 @@ function captureSheepStateSnapshot(state) {
     tray: state.tray.map(cloneSheepTile),
     remainingTiles: state.remainingTiles,
     status: state.status,
+    startedAt: state.startedAt,
+    moveCount: state.moveCount,
+    clearedAvatarStats: new Map(state.clearedAvatarStats),
   }
 }
 
@@ -2109,6 +2346,9 @@ function restoreSheepStateSnapshot(state, snapshot) {
   state.remainingTiles = snapshot.remainingTiles
   state.status = snapshot.status
   state.autoShuffleNotice = ''
+  state.startedAt = snapshot.startedAt || Date.now()
+  state.moveCount = snapshot.moveCount || 0
+  state.clearedAvatarStats = new Map(snapshot.clearedAvatarStats || [])
 
   rebuildSheepStateMaps(state)
 }
@@ -2304,15 +2544,33 @@ function resolveTrayMatches(state) {
     }
   }
 
-  if (!removeCountByType.size) return
+  if (!removeCountByType.size) return []
 
+  const removedTiles = []
   state.tray = state.tray.filter(trayTile => {
     const removableCount = removeCountByType.get(trayTile.typeIndex) || 0
     if (!removableCount) return true
 
     removeCountByType.set(trayTile.typeIndex, removableCount - 1)
+    removedTiles.push(trayTile)
     return false
   })
+
+  return removedTiles
+}
+
+function addClearedAvatarStats(state, removedTiles) {
+  for (const tile of removedTiles) {
+    const avatarUser = normalizeAvatarUser(tile)
+    if (!avatarUser) continue
+
+    const existingEntry = state.clearedAvatarStats.get(avatarUser.avatarKey)
+
+    state.clearedAvatarStats.set(avatarUser.avatarKey, {
+      ...avatarUser,
+      count: (existingEntry?.count || 0) + 1,
+    })
+  }
 }
 
 function updateSheepGameStatus(state) {
@@ -2391,14 +2649,15 @@ function findPreferredSheepStack(state) {
   return preferredStack
 }
 
-function applySheepStackSelection(state, stackState) {
+function applySheepStackSelection(state, stackState, {
+  trackClears = false,
+} = {}) {
   if (!stackState || !stackState.tiles.length) return null
   if (!isStackSelectable(state, stackState)) return null
 
   const topTile = stackState.tiles[stackState.tiles.length - 1]
   if (!topTile) return null
 
-  const trayLengthBeforePush = state.tray.length
   stackState.tiles.pop()
   state.tileById.delete(topTile.tileId)
   state.remainingTiles -= 1
@@ -2409,13 +2668,22 @@ function applySheepStackSelection(state, stackState) {
     typeIndex: topTile.typeIndex,
     typeLabel: topTile.typeLabel,
     typeClass: topTile.typeClass,
+    userId: topTile.userId,
+    displayName: topTile.displayName,
+    avatarUrl: topTile.avatarUrl,
+    avatarKey: topTile.avatarKey,
   })
-  resolveTrayMatches(state)
+  const removedTiles = resolveTrayMatches(state)
+  if (trackClears) {
+    state.moveCount += 1
+    addClearedAvatarStats(state, removedTiles)
+  }
   updateSheepGameStatus(state)
 
   return {
     tile: topTile,
-    resolvedTripleCount: Math.max(0, trayLengthBeforePush + 1 - state.tray.length) / 3,
+    removedTiles,
+    resolvedTripleCount: Math.max(0, removedTiles.length) / 3,
   }
 }
 
@@ -2670,6 +2938,87 @@ function renderSheepControls({
   }
 }
 
+function formatMatch3Duration(durationMs) {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return minutes
+    ? `${minutes}:${String(seconds).padStart(2, '0')}`
+    : `${seconds}s`
+}
+
+function createMatch3RecordList(records, renderItem) {
+  const list = document.createElement('ol')
+
+  list.className = 'sf-match3-record-list'
+
+  if (!records.length) {
+    const item = document.createElement('li')
+
+    item.className = 'sf-match3-record-empty'
+    item.textContent = '暂无记录'
+    list.append(item)
+    return list
+  }
+
+  records.forEach((record, index) => {
+    const item = document.createElement('li')
+
+    item.append(renderItem(record, index))
+    list.append(item)
+  })
+
+  return list
+}
+
+function renderMatch3RecordsPanel(panel, records) {
+  const normalizedRecords = normalizeMatch3Records(records)
+  const title = document.createElement('div')
+  const fastestSection = document.createElement('section')
+  const avatarSection = document.createElement('section')
+  const fastestTitle = document.createElement('h4')
+  const avatarTitle = document.createElement('h4')
+
+  title.className = 'sf-match3-records-title'
+  title.textContent = '本地战绩'
+  fastestTitle.textContent = '最快通关'
+  avatarTitle.textContent = '消除最多'
+
+  fastestSection.append(
+    fastestTitle,
+    createMatch3RecordList(normalizedRecords.fastestClears, record => {
+      const row = document.createElement('span')
+
+      row.className = 'sf-match3-record-row'
+      row.textContent = `${formatMatch3Duration(record.durationMs)} / ${record.moveCount} 步`
+      return row
+    }),
+  )
+
+  avatarSection.append(
+    avatarTitle,
+    createMatch3RecordList(normalizedRecords.avatarClears, record => {
+      const row = document.createElement('span')
+      const avatar = document.createElement('span')
+      const name = document.createElement('span')
+      const count = document.createElement('span')
+
+      row.className = 'sf-match3-record-row sf-match3-avatar-record-row'
+      avatar.className = 'sf-match3-record-avatar'
+      avatar.style.backgroundImage = `url("${record.avatarUrl}")`
+      name.className = 'sf-match3-record-name'
+      name.textContent = record.userId || record.displayName || record.avatarKey
+      count.className = 'sf-match3-record-count'
+      count.textContent = `${record.count}`
+      row.append(avatar, name, count)
+      return row
+    }),
+  )
+
+  panel.replaceChildren(title, fastestSection, avatarSection)
+}
+
 function removeOldestSheepTrayTiles(state, count) {
   const removeCount = Math.max(0, Math.min(count, state.tray.length))
   if (!removeCount) return
@@ -2733,6 +3082,7 @@ function mountSheepMode({
   leftBoard,
   rightBoard,
   hudHost = container,
+  storage,
   leftStacks,
   rightStacks,
   resolveFrameClass,
@@ -2754,11 +3104,15 @@ function mountSheepMode({
   const statusEffect = document.createElement('div')
   const statusEffectTitle = document.createElement('div')
   const statusEffectSubtitle = document.createElement('div')
+  const recordsPanel = document.createElement('div')
   const buttonsByAction = {}
   let autoShuffleNoticeTimer = 0
   let statusEffectTimer = 0
   let initialSnapshot = null
   let previousRenderedStatus = state.status
+  let activeRecords = createEmptyMatch3Records()
+  let isRecordsPanelVisible = false
+  let hasRecordedCurrentClear = false
 
   trayBar.className = 'sf-match3-tray'
   trayHeader.className = 'sf-match3-tray-header'
@@ -2774,6 +3128,8 @@ function mountSheepMode({
   statusEffectTitle.className = 'sf-match3-status-effect-title'
   statusEffectSubtitle.className = 'sf-match3-status-effect-subtitle'
   statusEffect.append(statusEffectTitle, statusEffectSubtitle)
+  recordsPanel.className = 'sf-match3-records-panel'
+  renderMatch3RecordsPanel(recordsPanel, activeRecords)
 
   const controlDefinitions = layoutMode === 'traditional'
     ? [ {
@@ -2789,6 +3145,9 @@ function mountSheepMode({
     }, {
       action: 'undo',
       label: '撤回',
+    }, {
+      action: 'records',
+      label: '战绩',
     } ]
     : [ {
       action: 'undo',
@@ -2800,6 +3159,9 @@ function mountSheepMode({
       action: 'restart',
       label: '重开',
       emphasis: true,
+    }, {
+      action: 'records',
+      label: '战绩',
     } ]
 
   for (const definition of controlDefinitions) {
@@ -2817,7 +3179,36 @@ function mountSheepMode({
 
   hudHost.append(trayBar)
   hudHost.append(controls)
+  hudHost.append(recordsPanel)
   container.append(statusEffect)
+
+  const loadAndRenderRecords = async () => {
+    if (!storage) return
+
+    activeRecords = await readMatch3Records(storage)
+    renderMatch3RecordsPanel(recordsPanel, activeRecords)
+  }
+
+  const setRecordsPanelVisible = visible => {
+    isRecordsPanelVisible = visible
+    recordsPanel.classList.toggle('is-visible', isRecordsPanelVisible)
+
+    if (isRecordsPanelVisible) {
+      loadAndRenderRecords()
+    }
+  }
+
+  const recordCurrentClear = async () => {
+    if (!storage || hasRecordedCurrentClear) return
+
+    hasRecordedCurrentClear = true
+    activeRecords = await addMatch3ClearRecord(storage, {
+      durationMs: Date.now() - state.startedAt,
+      moveCount: state.moveCount,
+      clearedAvatarStats: state.clearedAvatarStats,
+    })
+    renderMatch3RecordsPanel(recordsPanel, activeRecords)
+  }
 
   const render = () => {
     if (leftBoard) {
@@ -2852,6 +3243,10 @@ function mountSheepMode({
       showFailedStatusEffect()
     } else if (previousRenderedStatus === SHEEP_STATUS_FAILED && state.status !== SHEEP_STATUS_FAILED) {
       clearStatusEffect()
+    }
+
+    if (state.status === SHEEP_STATUS_CLEARED && previousRenderedStatus !== SHEEP_STATUS_CLEARED) {
+      recordCurrentClear()
     }
 
     previousRenderedStatus = state.status
@@ -2953,6 +3348,8 @@ function mountSheepMode({
     clearStatusEffect()
     restoreSheepStateSnapshot(state, initialSnapshot)
     history.length = 0
+    state.startedAt = Date.now()
+    hasRecordedCurrentClear = false
 
     if (layoutMode !== 'traditional') {
       stabilizeSheepState({
@@ -3017,6 +3414,11 @@ function mountSheepMode({
       return
     }
 
+    if (action === 'records') {
+      setRecordsPanelVisible(!isRecordsPanelVisible)
+      return
+    }
+
     if (action === 'restart') {
       restartSheepMode()
     }
@@ -3047,7 +3449,9 @@ function mountSheepMode({
     pushSheepHistory(history, state)
 
     clearAutoShuffleNotice()
-    applySheepStackSelection(state, stackState)
+    applySheepStackSelection(state, stackState, {
+      trackClears: true,
+    })
 
     if (layoutMode !== 'traditional') {
       stabilizeSheepState({
@@ -3084,7 +3488,9 @@ function removeWallpaperContainer() {
 }
 
 function renderWallpaper({
+  storage,
   avatars,
+  avatarUsers,
   favoriteAvatarUrls,
   opacity,
   backgroundPreset,
@@ -3104,6 +3510,10 @@ function renderWallpaper({
     avatars,
     favoriteAvatarUrls,
     prioritizeFavoritesFirst,
+  })
+  const renderAvatarUsers = getRenderAvatarUsers({
+    avatarUsers,
+    renderUrls,
   })
   const resolveFrameClass = createAvatarFrameResolver({
     favoriteAvatarUrls,
@@ -3242,6 +3652,7 @@ function renderWallpaper({
 
       const sheepTiles = createSheepTileDeck({
         urls: renderUrls,
+        avatarUsers: renderAvatarUsers,
         targetTripleGroupCounts: SHEEP_TRADITIONAL_TRIPLE_GROUP_COUNTS,
       })
       if (sheepTiles.length !== expectedTileCount) return
@@ -3307,6 +3718,7 @@ function renderWallpaper({
         rightStacks,
         resolveFrameClass,
         openingEvaluation,
+        storage,
         layoutMode: 'traditional',
       })
 
@@ -3348,6 +3760,7 @@ function renderWallpaper({
 
       const sheepTiles = createSheepTileDeck({
         urls: renderUrls,
+        avatarUsers: renderAvatarUsers,
       })
       if (sheepTiles.length !== expectedTileCount) return
 
@@ -3384,6 +3797,7 @@ function renderWallpaper({
         rightStacks,
         resolveFrameClass,
         openingEvaluation,
+        storage,
       })
     }
   } else {
@@ -3438,6 +3852,7 @@ export default context => {
     proxiedFetch,
   } = requireModules([ 'storage', 'fanfouOAuth', 'proxiedFetch' ])
 
+  let activeAvatarUsers = []
   let activeAvatarUrls = []
   let activeFavoriteAvatarUrls = []
   let activeOpacity = DEFAULT_OPACITY
@@ -3454,9 +3869,9 @@ export default context => {
     writeTraditionalMatch3MinimizedState(minimized)
   }
 
-  async function fetchAvatarUrls() {
+  async function fetchAvatarUsers() {
     try {
-      const avatarsFromApi = await fetchAvatarUrlsFromApi(fanfouOAuth)
+      const avatarsFromApi = await fetchAvatarUsersFromApi(fanfouOAuth)
 
       if (avatarsFromApi.length) {
         return avatarsFromApi
@@ -3465,17 +3880,17 @@ export default context => {
       // OAuth 未配置或请求失败时，回退到页面抓取方案
     }
 
-    const avatarsFromAutocompleteCache = await readAvatarUrlsFromAutocompleteCache(storage)
+    const avatarsFromAutocompleteCache = await readAvatarUsersFromAutocompleteCache(storage)
     if (avatarsFromAutocompleteCache.length) {
       return avatarsFromAutocompleteCache
     }
 
-    const avatarsFromAutocompleteEndpoint = await fetchAvatarUrlsFromAutocompleteEndpoint()
+    const avatarsFromAutocompleteEndpoint = await fetchAvatarUsersFromAutocompleteEndpoint()
     if (avatarsFromAutocompleteEndpoint.length) {
       return avatarsFromAutocompleteEndpoint
     }
 
-    return fetchAvatarUrlsFromWebPages(proxiedFetch)
+    return fetchAvatarUsersFromWebPages(proxiedFetch)
   }
 
   async function ensureAvatarCache() {
@@ -3487,24 +3902,32 @@ export default context => {
     const cache = await readCache(storage)
 
     if (isCacheFresh(cache, refreshIntervalDays)) {
-      return cache.avatars
+      return dedupeAndNormalizeAvatarUsers(
+        Array.isArray(cache.avatarUsers) && cache.avatarUsers.length
+          ? cache.avatarUsers
+          : cache.avatars,
+      )
     }
 
-    const fetchedUrls = await fetchAvatarUrls()
+    const fetchedAvatarUsers = await fetchAvatarUsers()
 
-    if (fetchedUrls.length) {
-      await writeCache(storage, fetchedUrls)
-      return fetchedUrls
+    if (fetchedAvatarUsers.length) {
+      await writeCache(storage, fetchedAvatarUsers)
+      return fetchedAvatarUsers
     }
 
-    return Array.isArray(cache?.avatars)
-      ? cache.avatars
-      : []
+    return dedupeAndNormalizeAvatarUsers(
+      Array.isArray(cache?.avatarUsers) && cache.avatarUsers.length
+        ? cache.avatarUsers
+        : cache?.avatars,
+    )
   }
 
   function renderUsingActiveState() {
     renderWallpaper({
+      storage,
       avatars: activeAvatarUrls,
+      avatarUsers: activeAvatarUsers,
       favoriteAvatarUrls: activeFavoriteAvatarUrls,
       opacity: activeOpacity,
       backgroundPreset: activeBackgroundPreset,
@@ -3531,7 +3954,8 @@ export default context => {
     activeFillBlueOnlyInGaps = readOptionValue('fillBlueOnlyInGaps') !== false
     activeMatch3Mode = readOptionValue('match3Mode') === true
     activeMatch3TraditionalMinimized = readTraditionalMatch3MinimizedState()
-    activeAvatarUrls = await ensureAvatarCache()
+    activeAvatarUsers = await ensureAvatarCache()
+    activeAvatarUrls = avatarUsersToUrls(activeAvatarUsers)
     activeFavoriteAvatarUrls = await readFavoriteAvatarUrls(storage)
 
     renderUsingActiveState()
