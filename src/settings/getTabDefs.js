@@ -4,6 +4,7 @@ import messaging from './messaging'
 import VersionHistory from './components/VersionHistory'
 import HelpAndSupport from './components/HelpAndSupport'
 import OAuthPanel from './components/OAuthPanel'
+import PersonalArchivePanel from './components/PersonalArchivePanel'
 import { GET_OPTION_DEFS } from '@constants'
 
 const tabDefs = [ {
@@ -75,6 +76,12 @@ const tabDefs = [ {
       'fanfou-oauth',
     ],
     children: <OAuthPanel />,
+  }, {
+    title: '个人归档',
+    options: [
+      'personal-archive',
+    ],
+    children: <PersonalArchivePanel />,
   } ],
 }, {
   title: '更新历史',
