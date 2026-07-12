@@ -1,5 +1,5 @@
 /* eslint-disable require-await, no-console */
-const { chromium } = require('playwright');
+const { chromium } = require('@playwright/test');
 
 (async () => {
   const pathToExtension = require('path').join(__dirname, 'dist')

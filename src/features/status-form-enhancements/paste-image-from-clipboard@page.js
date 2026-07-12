@@ -1,8 +1,8 @@
-/* eslint-disable no-console */
 import select from 'select-dom'
 import { setAttachment } from './attachmentStore'
 import { showElement } from '@libs/toggleVisibility'
 import blobToBase64 from '@libs/blobToBase64'
+import log from '@libs/log'
 
 const MAX_CLIPBOARD_IMAGE_BYTES = Math.round(2.5 * 1024 * 1024)
 const JPEG_QUALITIES = [ 0.92, 0.85, 0.75, 0.65, 0.55 ]
@@ -74,32 +74,15 @@ async function normalizeClipboardImage(imageBlob) {
         bestBlob = jpegBlob
       }
       if (jpegBlob.size <= MAX_CLIPBOARD_IMAGE_BYTES) {
-        console.log('[SpaceFanfou Clipboard] 已将过大的 PNG 转为 JPEG 以上传:', {
-          originalType: imageBlob.type,
-          originalSize: imageBlob.size,
-          normalizedType: jpegBlob.type,
-          normalizedSize: jpegBlob.size,
-          quality,
-          width: canvas.width,
-          height: canvas.height,
-        })
         return jpegBlob
       }
     }
 
     if (bestBlob !== imageBlob) {
-      console.log('[SpaceFanfou Clipboard] PNG 转 JPEG 后虽仍偏大，但已获得更小文件，使用更小版本上传:', {
-        originalType: imageBlob.type,
-        originalSize: imageBlob.size,
-        normalizedType: bestBlob.type,
-        normalizedSize: bestBlob.size,
-        width: canvas.width,
-        height: canvas.height,
-      })
       return bestBlob
     }
   } catch (error) {
-    console.warn('[SpaceFanfou Clipboard] 剪贴板图片归一化失败，回退原图上传:', error)
+    log.warn('剪贴板图片归一化失败，回退原图上传:', error)
   }
 
   return imageBlob
@@ -114,12 +97,6 @@ async function onPaste(event) {
 
   const normalizedBlob = await normalizeClipboardImage(imageBlob)
   const imageType = getExtensionFromMimeType(normalizedBlob.type)
-  console.log('[SpaceFanfou Clipboard] 捕获到剪贴板图片:', {
-    originalType: imageBlob.type,
-    originalSize: imageBlob.size,
-    uploadType: normalizedBlob.type,
-    uploadSize: normalizedBlob.size,
-  })
 
   const uploadFilename = select('#upload-filename')
   uploadFilename.textContent = `image-from-clipboard.${imageType}`

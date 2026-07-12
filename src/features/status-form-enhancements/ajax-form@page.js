@@ -1,5 +1,3 @@
-/* eslint-disable no-console */
-// 保留console用于表单提交和AJAX错误调试
 import select from 'select-dom'
 import triggerEvent from 'compat-trigger-event'
 import objectToFormData from 'object-to-formdata'
@@ -10,6 +8,7 @@ import { isHomePage } from '@libs/pageDetect'
 import parseHTML from '@libs/parseHTML'
 import isHotkey from '@libs/isHotkey'
 import extractFanfouErrorMessage from '@libs/extractFanfouErrorMessage'
+import log from '@libs/log'
 import { POST_STATUS_SUCCESS_EVENT_TYPE } from '@constants'
 
 const API_URL_PLAIN_MESSAGE = '/home'
@@ -196,7 +195,7 @@ export default context => {
       xhr.onload = () => safeJSONParse(xhr.responseText, (error, json) => {
         if (error) {
           const message = extractFanfouErrorMessage(xhr.responseText, xhr.status)
-          console.error('[SpaceFanfou DEBUG] 饭否返回了非 JSON 响应:', {
+          log.error('饭否返回了非 JSON 响应:', {
             status: xhr.status,
             url,
             message,
@@ -224,13 +223,10 @@ export default context => {
   }
 
   async function postMessage(form) {
-    console.log('[SpaceFanfou DEBUG] postMessage 开始', form)
     if (submittingForms.get(form)) {
-      console.log('[SpaceFanfou DEBUG] 当前表单正在提交中，抛弃重复请求')
       return
     }
     toggleState(form, true)
-    console.log('[SpaceFanfou DEBUG] 当前表单已禁用')
 
     let response
     let isSuccess = false
@@ -240,27 +236,16 @@ export default context => {
 
     try {
       // 总是先刷新 token，避免因 token 过期导致发送消息失败
-      console.log('[SpaceFanfou DEBUG] 开始刷新 token')
       await refreshToken(form)
-      console.log('[SpaceFanfou DEBUG] token 刷新完成')
 
       const extracted = extractFormData(form)
       const { isImageAttached: nextIsImageAttached, formDataJson: nextFormDataJson } = extracted
       isImageAttached = nextIsImageAttached
       formDataJson = nextFormDataJson
 
-      console.log('[SpaceFanfou DEBUG] 提取表单数据:', {
-        action: formDataJson.action,
-        isImageAttached,
-        hasPhotoBase64: !!formDataJson.photo_base64,
-        hasPicture: !!formDataJson.picture,
-        pictureType: formDataJson.picture?.constructor?.name,
-        inReplyTo: formDataJson.in_reply_to_status_id,
-      })
       const url = isImageAttached ? API_URL_UPLOAD_IMAGE : API_URL_PLAIN_MESSAGE
       startTime = Date.now()
 
-      console.log('[SpaceFanfou DEBUG] 开始发送请求到:', url)
       const submitButton = form.querySelector('input[type="submit"], button[type="submit"]')
 
       response = await performAjaxRequest(url, formDataJson, isImageAttached, event => {
@@ -270,17 +255,14 @@ export default context => {
         if (submitButton) submitButton.value = percent
       })
       isSuccess = !!response?.status
-      console.log('[SpaceFanfou DEBUG] 请求完成，成功:', isSuccess)
     } catch (error) {
-      console.error('[SpaceFanfou DEBUG] postMessage 失败:', error)
+      log.error('postMessage 失败:', error)
       isSuccess = false
       // Fallback Strategy: Never revert to a raw `form.submit()` native fallback as that is prone to double posts or hanging.
       // We gracefully digest the error and show a toast so the user can literally hit `发送` again.
     } finally {
-      console.log('[SpaceFanfou DEBUG] 进入 finally，准备恢复当前表单输入框')
       // 无论成功还是失败，都释放当前锁
       toggleState(form, false)
-      console.log('[SpaceFanfou DEBUG] 当前表单锁已释放，UI恢复')
     }
 
     if (isSuccess) {
