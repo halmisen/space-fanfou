@@ -46,3 +46,29 @@ The user confirmed that task-series files should be supplemented so TODO and sta
 ### Status Update
 
 `tasks/STATUS.md` now lists the full task-record file set, so future agents can start from the project-local status surface instead of relying on dated snapshots or chat history.
+
+## 2026-07-13 三项体验改进 + 测试通道全自动化
+
+Executor: claude
+Timestamp: 2026-07-13T10:05:00+08:00
+
+### Context
+
+用户加载 2026.8 dist 手测 mute-fanfouers 后提出三点反馈；讨论定稿后一次交付。
+
+### Changes
+
+- 动态弹出菜单：`actionLauncher.js` 按标签页 setPopup——饭否标签页弹设置弹窗（恢复旧 default_popup 体验），其他标签页跳转饭否；onUpdated 重挂 + SW 启动全量扫描。
+- 静音链接归位：个人页「静音此人」插入原生「他关注的消息 和他的对话 检查与他的关系」链接排末尾（文本正则定位，找不到回退 #info 底部）。
+- 新功能 `unify-sidebar-panels`（默认关）：统一三个侧栏饭友面板为网格或列表；纯 CSS（body 类），设置页「侧栏」区注册。
+- 修复过程教训（lessons.md #26）：原生 `.alist a` 是 float:left + 固定 48px 宽，语义猜测 DOM 导致列表模式首版失败，登录抓 computed style 后一轮修复。
+
+### Infrastructure
+
+- 测试凭据固化到 repo `.env`（gitignored，600），用户明确要求不再每次索要。
+- OAuth 一键授权已验证可自动化：设置页「开始授权」→ 授权页「同意」，统计信息出真实数据（pic/17）。
+- agent-browser 坑位记录：默认视口过窄会隐藏侧栏（需 set viewport 1440 900）；重建 dist 后需 close --all 再带 --extension 重启（残留守护进程会复用无扩展的浏览器）。
+
+### Verification
+
+npm test 14 suites / 34 tests 过；build 过（page.js 842 KiB / 上限 848）；登录实测截图 pic/13~17；控制台无本插件报错。弹窗点击行为留用户人工验收。

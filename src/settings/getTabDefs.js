@@ -15,6 +15,7 @@ const tabDefs = [ {
       'enrich-statuses',
       'auto-pager',
       'process-unread-statuses',
+      'mute-fanfouers',
     ],
   }, {
     title: '输入框',
@@ -26,6 +27,7 @@ const tabDefs = [ {
     options: [
       'favorite-fanfouers',
       'check-saved-searches',
+      'unify-sidebar-panels',
     ],
   }, {
     title: '批量管理',

@@ -1,7 +1,7 @@
 # Space Fanfou Status
 
-Updated: 2026-06-08T15:47:47+08:00
-Executor: codex
+Updated: 2026-07-13T10:05:00+08:00
+Executor: claude
 Status: active cockpit
 
 ## Source Order
@@ -26,15 +26,24 @@ Status: active cockpit
 
 ## Current Feature State
 
-- Extension icon action launcher: implemented on branch `2026.8`; clicking the extension icon opens or focuses `https://fanfou.com/home`.
+- Extension icon action (2026-07-13): dynamic per-tab behavior — on fanfou.com tabs the icon opens the settings popup (`settings.html`); on other tabs it opens or focuses `https://fanfou.com/home`. Popup click itself still needs the user's manual confirmation once.
+- Mute fanfouers (`mute-fanfouers`, 2026-07-12): timeline mute with conversation matching, sidebar 「无爱饭友」 management panel (below 我关注的人), profile-page 静音此人 link placed inline with the native ops link row (2026-07-13). Fully verified logged-in.
+- Unify sidebar panels (`unify-sidebar-panels`, 2026-07-13): optional (default off) grid/list layout unification for 有爱饭友 / 我关注的人 / 无爱饭友. CSS-only via body classes. Verified logged-in, both modes (pic/13~16).
 - Fanfou font preset feature: implemented as a user-selectable setting.
 - Avatar match3 local records: implemented with `chrome.storage.local`; records are backend-free.
 
-Last full implementation verification for those feature changes:
+Last full verification (2026-07-13): `npm test` (14 suites / 34 tests) passed, `npm run build` passed (page.js 842 KiB, limit 848), agent-browser logged-in acceptance with screenshots.
 
-- ESLint targeted files: passed.
-- Stylelint targeted files: passed with existing Browserslist/stylelint deprecation warnings only.
-- `npm run build`: passed.
+## Pending (specs ready, awaiting user scheduling)
+
+- `docs/spec-undo-status.md`: 30s undo for just-posted statuses (~0.5 day).
+- `docs/spec-annual-report.md`: personal annual report extension page (P0 1.5~2 days + P1 1 day).
+- All work since the last commit is uncommitted on `2026.8` (mute-fanfouers, unify-sidebar-panels, action popup, specs).
+
+## Test Automation Channel
+
+- Credentials in repo-root `.env` (gitignored, chmod 600) — do not ask the user again.
+- Flow: `agent-browser --extension <repo>/dist --session sf-test open https://fanfou.com/login` → `set viewport 1440 900` (narrow default viewport hides the sidebar) → fill from `.env` → one-click OAuth via settings page (开始授权 → 同意). Details in project memory `fanfou-test-account`.
 
 ## Distribution Decision
 

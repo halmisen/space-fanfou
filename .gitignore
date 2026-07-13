@@ -31,3 +31,6 @@ debug-*
 bug/
 settings_page_debug.png
 space-fanfou-*.tar.gz
+pic/
+.env
+design-sync/

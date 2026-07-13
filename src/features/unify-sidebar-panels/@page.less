@@ -1,0 +1,90 @@
+// 统一「有爱饭友」「我关注的人」「无爱饭友」三个侧栏面板的排版
+// 网格模式：原生 #friends 与有爱饭友本来就是头像网格，只需把无爱饭友改成瓦片
+// 列表模式：无爱饭友本来就是列表，把另外两个面板拉成「小头像 + 昵称」整行
+
+body.sf-sidebar-panels-grid {
+  .sf-mute-fanfouers-items {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .sf-mute-fanfouer-item {
+    position: relative;
+    display: block;
+    margin: 0 5px 8px 0;
+    width: 52px;
+    line-height: 1.2;
+
+    a:first-child {
+      display: block;
+      text-align: center;
+
+      img {
+        display: block;
+        margin: 0 auto 2px;
+        width: 48px;
+        height: 48px;
+        border-radius: 2px;
+      }
+
+      span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+      }
+    }
+
+    .sf-mute-remove {
+      position: absolute;
+      top: -4px;
+      right: -2px;
+      margin: 0;
+      padding: 0 3px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      line-height: 14px;
+      opacity: 0;
+    }
+
+    &:hover .sf-mute-remove {
+      opacity: 1;
+    }
+  }
+}
+
+body.sf-sidebar-panels-list {
+  #friends .alist li,
+  #sf-favorite-fanfouers-list .alist li {
+    float: none;
+    display: block;
+    margin: 0 15px 4px 0;
+    width: auto;
+    height: auto;
+    text-align: left;
+
+    a {
+      // 原生 .alist a 是 float: left + 固定 48px 宽的头像瓦片，列表模式下都放开
+      float: none;
+      display: flex;
+      align-items: center;
+      width: auto;
+      height: auto;
+      min-width: 0;
+
+      img {
+        flex-shrink: 0;
+        margin: 0 6px 0 0;
+        width: 20px;
+        height: 20px;
+        border-radius: 2px;
+      }
+    }
+  }
+
+  // 有爱饭友的拖拽把手是按头像瓦片设计的，列表模式下隐藏（可切回网格模式排序）
+  #sf-favorite-fanfouers-list .sf-drag-handle {
+    display: none;
+  }
+}

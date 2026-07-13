@@ -1,0 +1,59 @@
+#sf-mute-fanfouers-list {
+  display: none;
+  margin-bottom: 15px;
+
+  &.sf-is-ready {
+    display: block;
+  }
+}
+
+.sf-mute-fanfouers-empty {
+  margin-right: 15px;
+  color: #999;
+  font-size: 12px;
+}
+
+.sf-mute-fanfouers-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-mute-fanfouer-item {
+  display: flex;
+  align-items: center;
+  margin: 0 15px 4px 0;
+  line-height: 20px;
+
+  a:first-child {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+
+    img {
+      margin-right: 6px;
+      width: 20px;
+      height: 20px;
+      border-radius: 2px;
+    }
+
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .sf-mute-remove {
+    margin-left: 8px;
+    padding: 0 4px;
+    color: #999;
+    cursor: pointer;
+
+    &:hover {
+      color: #c00;
+      text-decoration: none;
+    }
+  }
+}
