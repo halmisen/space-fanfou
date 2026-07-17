@@ -1,14 +1,16 @@
 # Distribution and Developer-mode Storage Notes
 
-Updated: 2026-06-08
+Updated: 2026-07-17
 Executor: codex
 Status: current decision note
 
 ## Current Reality
 
-- The original Chrome Web Store listing for the Fanfou extension is controlled by Fanfou official. This fork cannot update that listing unless the official owner transfers ownership or explicitly authorizes release access.
+- The original Chrome Web Store listing was removed after its manifest was not updated in time.
+- The repository maintainer who accepted the Manifest V3 pull request is not Fanfou official and does not control the removed store listing. Repository maintenance access must not be treated as store publishing access.
 - Self-publishing to Chrome Web Store would create a separate extension listing and, by default, a separate extension ID. Existing users of the official listing would not automatically receive this fork.
 - The practical distribution path for now is still an unpacked folder loaded through Chrome developer mode.
+- The full two-route decision guide, including registration fees, CLI limits and browser-agent boundaries, is in [`docs/distribution-decision-guide.md`](./distribution-decision-guide.md).
 
 ## Chrome Web Store Path
 
@@ -55,11 +57,11 @@ Optional future path:
 
 - Whether to add a fixed manifest `key` for developer-mode builds.
 - Where export/import should live in the UI: settings page, avatar-wallpaper settings, or a general backup panel.
-- Whether this fork should pursue an independent Chrome Web Store listing, or first seek official transfer/authorization from Fanfou.
+- Whether this project should pursue a new independent Chrome Web Store listing or remain on the free unpacked-extension plus userscript route.
 
 ## References
 
-- Chrome Web Store developer registration: https://developer.chrome.google.cn/docs/webstore/register
+- Chrome Web Store developer registration: https://developer.chrome.com/docs/webstore/register
 - Chrome Web Store review process: https://developer.chrome.com/docs/webstore/review-process/
 - Chrome extension storage API: https://developer.chrome.com/docs/extensions/reference/api/storage
 - Manifest `key`: https://developer.chrome.com/docs/extensions/reference/manifest/key

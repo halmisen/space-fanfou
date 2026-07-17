@@ -1,6 +1,6 @@
 # 发布
 
-> 当前分发现实：原 Chrome Web Store listing 由饭否官方控制；本 fork 无法直接更新原 listing，除非获得转移或授权。当前开发者模式更新、Chrome 商店自发布、本地战绩迁移的判断记录见 [`docs/distribution-and-devmode-storage.md`](./distribution-and-devmode-storage.md)。
+> 当前分发现实：原 Chrome Web Store 条目已经因 Manifest 未及时更新而下架；接受 Manifest V3 PR 的仓库维护者不是饭否官方，也不掌握原商店条目。自行发布将创建新的独立条目。两条分发路线、费用、CLI 和浏览器代理边界见 [`docs/distribution-decision-guide.md`](./distribution-decision-guide.md)，开发者模式存储风险见 [`docs/distribution-and-devmode-storage.md`](./distribution-and-devmode-storage.md)。
 
 ### 如何选择新版本号
 

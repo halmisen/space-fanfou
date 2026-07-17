@@ -1,6 +1,6 @@
 # Space Fanfou Logic
 
-Updated: 2026-06-08T15:47:47+08:00
+Updated: 2026-07-17T16:00:59+08:00
 Executor: codex
 
 This file records durable decisions and reasoning. It is not a task checklist.
@@ -16,15 +16,17 @@ Reasoning:
 
 ## Distribution Path
 
-Decision: treat developer-mode folder distribution as the current practical path; treat Chrome Web Store self-publishing as a separate future release path.
+Decision: prepare both an independent Chrome Web Store route and a free route, while sharing one extension codebase. The free route consists of the unpacked full extension plus an optional userscript limited to visual and page-level enhancements.
 
 Reasoning:
 
-- The original Fanfou extension listing is controlled by Fanfou official, not this fork.
-- This fork cannot update the original listing unless ownership or release access is transferred.
+- The original Fanfou extension listing was removed after its manifest was not updated in time.
+- The repository maintainer who accepted the Manifest V3 pull request is not Fanfou official and does not control the removed listing.
 - A self-published listing would normally be a separate extension/listing with separate install and migration expectations.
+- The full extension depends on browser APIs that a userscript cannot replace, so the userscript is a lightweight skin rather than a second full product.
+- Shared compliance, privacy, permission, packaging and migration preparation should happen before the user decides whether to pay the registration fee.
 
-Reference: `docs/distribution-and-devmode-storage.md`
+Reference: `docs/distribution-decision-guide.md`
 
 ## Local Data and Match3 Records
 

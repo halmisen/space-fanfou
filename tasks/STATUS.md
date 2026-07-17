@@ -1,7 +1,7 @@
 # Space Fanfou Status
 
-Updated: 2026-07-13T10:05:00+08:00
-Executor: claude
+Updated: 2026-07-17T16:00:59+08:00
+Executor: codex
 Status: active cockpit
 
 ## Source Order
@@ -47,13 +47,15 @@ Last full verification (2026-07-13): `npm test` (14 suites / 34 tests) passed, `
 
 ## Distribution Decision
 
-The original Chrome Web Store listing is controlled by Fanfou official. This fork cannot update that listing without official transfer or authorization.
+The original Chrome Web Store listing was removed after its manifest was not updated in time. The repository maintainer who accepted the Manifest V3 pull request is not Fanfou official and does not control that listing.
 
-Current practical distribution path: unpacked folder + Chrome developer mode.
+Current practical distribution path: prepare both an independent Chrome Web Store route and a free route (unpacked full extension plus a narrowly scoped userscript), without maintaining two complete products.
+
+Current Web Store blocker: the production build loads remote Google Analytics JavaScript, which is prohibited for Manifest V3 store submissions and must be removed or replaced before submission.
 
 Risk: the current manifest has no fixed `key`, so loading a new folder can produce a different extension ID. Local `chrome.storage.local` records, including avatar match3 results, may not migrate automatically.
 
-Decision note: `docs/distribution-and-devmode-storage.md`
+Decision guide: `docs/distribution-decision-guide.md`
 
 ## Harness Integration
 
@@ -71,7 +73,7 @@ This is a lightweight harness integration: enough for the next agent to find cur
 
 1. Add export/import for safe local extension data, especially `avatar-wallpaper/match3Records`.
 2. Decide whether developer-mode builds should use a fixed manifest `key`.
-3. If pursuing Chrome Web Store self-publishing, prepare privacy policy, permission rationale, listing copy/assets, and migration notes.
+3. Remove remote Google Analytics code and complete the shared compliance/release preparation before deciding whether to pay the Web Store registration fee.
 
 ## Task Record Files
 

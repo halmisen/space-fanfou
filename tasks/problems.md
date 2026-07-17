@@ -1,6 +1,6 @@
 # Space Fanfou Problems and Risks
 
-Updated: 2026-06-08T15:47:47+08:00
+Updated: 2026-07-17T16:00:59+08:00
 Executor: codex
 
 This file tracks unresolved risks and blockers. Closed items should move into `lessons.md` or `journal.md`.
@@ -22,20 +22,21 @@ Mitigation:
 - Add export/import for safe local extension data before encouraging wider developer-mode updates.
 - Consider a fixed manifest `key` for developer-mode builds, but treat it as release infrastructure.
 
-### Chrome Web Store Listing Ownership
+### Chrome Web Store Independent Publishing
 
 Status: open
 
 Current understanding:
 
-- The original Fanfou extension listing is controlled by Fanfou official.
-- This fork cannot update that listing without transfer or authorization.
+- The original Fanfou extension listing was removed after its manifest was not updated in time.
+- The repository maintainer who accepted the Manifest V3 pull request is not Fanfou official and does not control that listing.
 - Self-publishing would be a separate listing and requires separate naming, privacy, listing assets, review process, and user migration notes.
+- The production extension currently loads remote Google Analytics JavaScript, which blocks a Manifest V3 Web Store submission until it is removed or replaced.
 
 Mitigation:
 
-- Keep current docs explicit about official ownership.
-- Prepare self-publishing only after privacy/export/import and listing copy are ready.
+- Keep current docs explicit that repository maintenance, official identity and store-listing control are different things.
+- Remove remote hosted code and prepare privacy/export/import, permission rationale and listing copy before registration or submission.
 
 ### `docs/project-status.md` May Be Stale
 
