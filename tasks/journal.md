@@ -340,3 +340,46 @@ A/B 实证（把表单可用宽度调到 200px，只少 4px）：
 工具坑位：`agent-browser tab list` 只列它自己创建的标签页，后台 `chrome.tabs.create` 开出来的
 标签页不在其中。一度据此误判「点击没反应」，实际用扩展页的 `chrome.tabs.query({})` 一查，
 两次点击开出的两个 `settings.html#personal-archive` 都在。验证扩展开新标签页要用后者。
+
+## 2026-08-03 控制面核对与测试基线纠正
+
+Executor: claude
+
+用户要求汇报 todo 的下一步计划。核对时发现控制面与 git 实际状态有三处不符，均已处理。
+
+### 测试数被重复计算了一倍
+
+`npm test` 跑出 50 suites / 182 tests，而 STATUS 记的是 24 / 85。原因不是新增测试：
+`worktree-archive-home-entry` 合并进 `2026.8` 后，其工作树 `.claude/worktrees/archive-home-entry`
+没有删除，`diff -rq` 确认它与主树 `src` 逐文件相同，Jest 的默认扫描把同一批测试跑了两遍。
+
+移除前已确认该工作树 `git status` 干净、`git log worktree-archive-home-entry --not 2026.8` 为空，
+即无未提交内容也无未合并提交。`git worktree remove` 后重跑，**25 suites / 91 tests 全过**——
+这才是真实基线。分支 ref 保留未删。
+
+教训：合并完成后要立刻 `git worktree remove`，否则测试计数、覆盖率和 lint 范围都会静默翻倍，
+而且翻倍后的数字看上去只是「测试变多了」，不会报错。
+
+### STATUS 的两处失准
+
+- 「`2026.8` 上自 `8167ea9` 起的工作仍未提交」已过时：`8167ea9` 之后有 8 个提交，
+  `worktree-archive-home-entry` 已合入，工作树干净，仅 `ba6d05a` 未推送（ahead 1）。
+- STATUS 把三条 origin/多页导航/安全上下文约束指向「`tasks/todo.md` 的 2026-08-03 小节」，
+  但该小节不存在，且 **`tasks/todo.md` 与 `tasks/lessons.md` 被 `.gitignore` 第 19-20 行排除**，
+  只存在于维护者的工作副本里。指针已改指本文件。
+
+由此定下一条规则：需要被另一台机器或另一个 agent 读到的结论，一律写进 `journal.md` /
+`STATUS.md` 这类跟踪文件；`todo.md` 只作为本地工作台，不做跨会话引用目标。
+
+### dist 重建
+
+主检出跑 `npm run build`：`BUILD_EXIT=0`，`page.js` 868629 bytes（门禁 864 KiB = 884736），
+`settings.js` 203814 bytes，`background.js` 341876 bytes。dist 为 gitignored 构建产物，
+重建不产生源码改动。用户可直接重载扩展做真机核对。
+
+顺带确认 `dist/google-analytics-bootstrap.js`（729 bytes）仍在产物中——这是商店提交的实质
+阻塞项，与个人归档无关，可独立处理。
+
+### 未做
+
+大号全量同步对账与断网零请求核对仍是个人归档的 open 项，必须人工在真实桌面 Chrome 上做。
