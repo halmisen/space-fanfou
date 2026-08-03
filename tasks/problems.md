@@ -1,6 +1,6 @@
 # Space Fanfou Problems and Risks
 
-Updated: 2026-07-17T16:00:59+08:00
+Updated: 2026-07-31T14:57:18+08:00
 Executor: codex
 
 This file tracks unresolved risks and blockers. Closed items should move into `lessons.md` or `journal.md`.

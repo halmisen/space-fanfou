@@ -4,6 +4,7 @@ import messaging from './messaging'
 import VersionHistory from './components/VersionHistory'
 import HelpAndSupport from './components/HelpAndSupport'
 import OAuthPanel from './components/OAuthPanel'
+import PersonalArchivePanel from '@features/personal-archive/panel/PersonalArchivePanel'
 import { GET_OPTION_DEFS } from '@constants'
 
 const tabDefs = [ {
@@ -78,6 +79,9 @@ const tabDefs = [ {
       'fanfou-oauth',
     ],
     children: <OAuthPanel />,
+  }, {
+    title: '个人归档',
+    children: <PersonalArchivePanel />,
   } ],
 }, {
   title: '更新历史',
@@ -101,6 +105,9 @@ export default async () => {
     if (!tabDef.sections) continue
 
     for (const section of tabDef.sections) {
+      // 纯自定义面板的 section 没有 options
+      if (!section.options) continue
+
       b.push(...section.options)
 
       section.options = section.options.map(featureName => optionDefs[featureName])
