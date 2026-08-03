@@ -20,8 +20,6 @@ tasks/lessons.md
 tasks/todo.md
 test-results/
 GEMINI.md
-CLAUDE.md
-AGENTS.md
 .claude/
 playwright-report/
 *-审核.md
