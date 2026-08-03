@@ -472,6 +472,14 @@ p.pm-parent {
   margin-bottom: 0.5em !important;
 }
 
+// 输入框和「搜索」按钮原本是两个相邻的 inline 控件，中间存在一个换行机会，
+// 而这一行本来就没有余量。页面缩放时边框宽度的舍入（0.8px 记成 1 设备像素）足以让
+// 两者的总宽超出侧栏，按钮被挤到第二行；`#searchr` 的高度不跟着长，于是压住下面的面板。
+// 改成 flex 行（默认 nowrap）就没有换行机会了，输入框按剩余空间伸缩。
+#searchr-form {
+  display: flex;
+}
+
 #searchr-input,
 #searchr-submit {
   border-color: rgba(0, 0, 0, 0.25);
@@ -480,6 +488,9 @@ p.pm-parent {
 }
 
 #searchr-input {
+  // input 的固有最小宽度来自 size 属性，不清零的话 flex 压不下去，仍会溢出侧栏
+  flex: 1 1 auto;
+  min-width: 0;
   background-color: rgba(255, 255, 255, 0.75);
 
   &:focus,
@@ -495,6 +506,7 @@ p.pm-parent {
 }
 
 #searchr-submit {
+  flex: 0 0 auto;
   text-shadow: 0 1px 0 #fff;
   background: #eee !important;
   border-radius: 0 5px 5px 0;
