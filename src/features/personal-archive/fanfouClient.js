@@ -29,6 +29,20 @@ export default function createFanfouClient(messaging) {
   }
 
   return {
+    /**
+     * 只读 OAuth 授权状态，不打 API。
+     * 备份的是「授权的那个账号」，不是网页当前登录的账号——多账号用户容易搞混，
+     * 面板需要在同步之前就把这个账号显示出来。
+     */
+    async fetchAuthorizationStatus() {
+      const response = await messaging.postMessage({
+        action: FANFOU_OAUTH_GET_STATUS,
+        payload: {},
+      })
+
+      return response?.status || null
+    },
+
     async fetchCurrentAccount() {
       const response = await messaging.postMessage({
         action: FANFOU_OAUTH_GET_STATUS,

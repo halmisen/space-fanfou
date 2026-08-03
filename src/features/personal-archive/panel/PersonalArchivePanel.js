@@ -36,6 +36,7 @@ export default class PersonalArchivePanel extends Component {
     progress: null,
     mediaProgress: null,
     offlineResult: null,
+    authorization: null,
     error: null,
   }
 
@@ -43,6 +44,17 @@ export default class PersonalArchivePanel extends Component {
 
   componentDidMount() {
     this.restoreDirectory()
+    this.loadAuthorizedAccount()
+  }
+
+  // 备份跟着 OAuth 授权走，不跟着网页登录走。多账号用户在网页切了号以后，
+  // 备份的仍然是原来授权的那个账号——必须在开始同步之前就把它显示出来。
+  async loadAuthorizedAccount() {
+    try {
+      this.setState({ authorization: await fanfouClient.fetchAuthorizationStatus() })
+    } catch (error) {
+      this.setState({ authorization: null })
+    }
   }
 
   componentDidUpdate(previousProps, previousState) {
@@ -139,6 +151,9 @@ export default class PersonalArchivePanel extends Component {
       error: null,
       progress: null,
     })
+
+    // 用户可能刚在上方「API 接入」重新授权过，显示的账号要跟上
+    this.loadAuthorizedAccount()
 
     try {
       // 必须是点击后的第一个异步动作，避免 user activation 在 OAuth/API await 中丢失。
@@ -256,6 +271,37 @@ export default class PersonalArchivePanel extends Component {
     return permissionLabels[this.state.permission] || '未知'
   }
 
+  /**
+   * 备份哪个账号由 OAuth 授权决定，与网页当前登录的账号无关。
+   * 有两个号的用户在网页上切了号，很容易以为备份也跟着切了——所以这行必须显眼，
+   * 而且要点破「不随网页登录切换」，光显示账号名不够。
+   */
+  renderAuthorizedAccount() {
+    const { authorization } = this.state
+
+    if (!authorization) return null
+
+    if (!authorization.hasTokens) {
+      return (
+        <p className="sf-personal-archive-panel__account">
+          ⚠️ 尚未完成授权，请先到上方「API 接入」完成授权。
+        </p>
+      )
+    }
+
+    const name = authorization.screenName || authorization.userId || '未知'
+
+    return (
+      <p className="sf-personal-archive-panel__account">
+        将备份账号：<strong>{ name }</strong>
+        <br />
+        这个账号由「API 接入」的 OAuth 授权决定，<strong>不随饭否网页切换账号而改变</strong>。
+        要备份另一个账号：先在饭否网页登录那个账号，再到上方「API 接入」取消授权并重新授权，
+        然后为它另选一个空文件夹。
+      </p>
+    )
+  }
+
   // 图床域名不在白名单时不静默跳过——把域名显示出来，用户反馈后加进 manifest 即可。
   renderSkippedHosts(skippedByHost) {
     const hosts = Object.entries(skippedByHost || {})
@@ -281,6 +327,8 @@ export default class PersonalArchivePanel extends Component {
     return (
       <div className="sf-personal-archive-panel">
         <p>把自己的饭否消息按月写入你选择的本地文件夹。备份中不会写入 OAuth token、Cookie 或签名。</p>
+
+        { this.renderAuthorizedAccount() }
 
         { loading && <p>正在读取备份文件夹…</p> }
         { !loading && (
