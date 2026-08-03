@@ -1,6 +1,6 @@
 # Space Fanfou Status
 
-Updated: 2026-08-03T09:35:00+08:00
+Updated: 2026-08-03T15:09:54+08:00
 Executor: claude
 Status: active cockpit
 
@@ -37,7 +37,10 @@ Last full verification (2026-07-13): `npm test` (14 suites / 34 tests) passed, `
 ## Current Work
 
 - 个人归档 P0（自有消息全量同步、按月分片、`meta.json` 水位、断点续传）与 P1 第一刀
-  （图片下载 + 离线 HTML）代码均已完成，`npm test` 24 suites / 85 tests 通过，生产构建通过。
+  （图片下载 + 离线 HTML）代码均已完成并合入 `2026.8`，`npm test` 25 suites / 91 tests 通过，
+  生产构建通过。（此前记录的 50 suites / 182 tests 是假象：合并后残留的
+  `.claude/worktrees/archive-home-entry` 与主树 `src` 逐文件相同，Jest 把同一批测试跑了两遍；
+  该 worktree 已于 2026-08-03 移除，25 / 91 才是真实基线。）
 - File System Access 地基已完整验收：真实目录选择、刷新后句柄恢复、Chrome 整体重启后句柄仍在、
   `prompt → granted` 授权、重启后再次写入，五项都有 Windows 磁盘文件为证。
 - API 探针已完成并回填 spec：`user_timeline` 390 页/23281 条，favorites 43 页/2471 条，
@@ -48,7 +51,9 @@ Last full verification (2026-07-13): `npm test` (14 suites / 34 tests) passed, `
 - 2026-08-03：归档页视觉基准从「设置页 token」改为 `design-sync/bundle/pages/design-spec.html`
   的《太空饭否当前设计规格》；新增饭否首页侧栏「本地备份」入口，替换失效的「邀请朋友加入」。
   完整备份流程仍留在设置页——目录句柄按 origin 存放、多页站点导航会中断长同步、
-  `http://fanfou.com` 不是安全上下文，三条约束写在 `tasks/todo.md` 的 2026-08-03 小节。
+  `http://fanfou.com` 不是安全上下文，三条约束的完整论证写在 `tasks/journal.md` 的
+  2026-08-03 小节。（`tasks/todo.md` 被 `.gitignore` 排除，只存在于维护者的工作副本里，
+  不能作为跨机器/跨 agent 的引用目标；需要被别人读到的结论一律写进 `journal.md`。）
 
 ## Pending
 
@@ -58,9 +63,8 @@ Last full verification (2026-07-13): `npm test` (14 suites / 34 tests) passed, `
   其余部分（API 分页、关键词算法、收藏口径、报告页版式）继续有效。
 - 大号（23281 条）的全量同步、中断续传与磁盘对账仍未做——这是个人归档唯一的 open 项。
 - 断网双击 `index.html` 的零请求核对未做。
-- 归档页新样式与首页入口未经真机核对（需重装扩展）。
-- `2026.8` 上自 `8167ea9` 起的工作仍未提交；本轮改动在分支 `worktree-archive-home-entry` 上，
-  用户的工作副本未被触碰。
+- 归档页新样式与首页入口未经真机核对（需重装扩展）。dist 已于 2026-08-03 重建，
+  `BUILD_EXIT=0`、`page.js` 868629 bytes（门禁 864 KiB），可直接重载。
 
 ## Test Automation Channel
 
@@ -97,7 +101,8 @@ This is a lightweight harness integration: enough for the next agent to find cur
 不要重做已关闭的 API/FSA 地基；`/tmp/space-fanfou-claude-handoff-2026-07-31.md` 已随机器清理消失，
 其内容在 `tasks/todo.md` 的 2026-07-31 小节有备份。
 
-1. 重新构建并重装扩展，核对饭否首页侧栏出现「本地备份」面板、点击能直达设置页个人归档标签。
+1. 重装扩展（dist 已于 2026-08-03 重建，无需再 build），核对饭否首页侧栏出现「本地备份」面板、
+   点击能直达设置页个人归档标签。
 2. 重新生成离线页面，核对样式与饭否本体一致（白底 775px 单列、`#336` 正文、`#933` 链接）。
 3. 用大号在「个人归档」面板选目录，启动全量同步，至少提交 2 页后暂停并核对页级水位。
 4. 点击「继续上次同步」跑完全量；核对去重数 23281、首尾 id、月份分片计数之和与 `meta.json`。
