@@ -253,3 +253,90 @@ Timestamp: 2026-07-31T15:25:59+08:00
   spike 的 IndexedDB 不能被正式面板复用，因此需要再选一次目录。
 - 工作树仍包含既有未提交改动和本轮 P0 实现；没有 commit、stash、reset、checkout 或清理用户文件。
 - 详细接手卡写在 `/tmp/space-fanfou-claude-handoff-2026-07-31.md`。
+
+## 2026-08-03 归档页视觉对齐与首页备份入口
+
+Executor: claude
+
+### 起点：用户的两条真机反馈
+
+- 用户上周用小号（1483 条）在真实 Windows Chrome 跑通了「下载图片 → 生成离线页面」，
+  截图显示图片正常显示、按年分卷与跨年搜索均可用。这实质关掉了 P1 第 7 步的大半。
+- 反馈一：生成的离线页「和我们的美化版本完全不一样」。
+- 反馈二：备份入口埋在设置页太深，希望替换饭否首页侧栏那块已失效的「邀请朋友加入」。
+
+### 找到「美化版本」的权威出处
+
+`design-sync/bundle/pages/design-spec.html` 是 2026-07-13 在插件生效状态下从真实饭否页面
+量出来的《太空饭否当前设计规格》：正文 `#336`、链接 `#933`、次要信息 `#999`、白底、
+容器 775px、body 12px/18px、消息正文 14px/22.4px、头像 48×48、字体族为饭否字体预设那一串。
+
+归档页的 CSS 注释白纸黑字写着「沿用太空饭否设置页的设计 token（settings.less）」——
+对齐错了对象。设置页是插件自有页面（`#555` / `#06c` / `#f2f2f2` 灰底 + 圆角卡片 + 阴影），
+饭否本体是另一套。归档页展示的是饭否内容，理应归后者。按规格总表逐项重写了 ARCHIVE_CSS。
+
+顺带确认：`docs/feature-directions.md` 3.1 的「界面美化」是另一条线，一行代码都还没写，
+不是本次对齐目标——不要把两者混为一谈。
+
+### 首页只放入口，不放完整流程
+
+三条硬约束决定了完整备份不能搬进首页：
+
+1. `FileSystemDirectoryHandle` 按 origin 存在 IndexedDB 里。设置页是 `chrome-extension://<id>`，
+   饭否首页是 `https://fanfou.com`，两边拿不到对方的句柄。真做在首页，同一个文件夹要授权两次。
+2. 饭否是传统多页站点。大号 390 页的全量同步要跑几分钟到几十分钟，期间点任何链接都会让
+   content script 连同同步状态一起销毁。设置页是独立标签页，不受影响。
+3. manifest 的 content script 同时匹配 `http://fanfou.com/*`，走 http 时不是安全上下文，
+   `window.showDirectoryPicker` 根本不存在。
+
+所以首页面板只显示「上次备份到哪」并提供一键进入设置页的链接。两边靠
+`chrome.storage.local` 里的 `personal-archive/summary` 通信——这是首页唯一能拿到的信息来源。
+摘要刻意不含备份目录路径与账号 id，侧栏是截图高发区。
+
+### bundle 体积门禁上调
+
+加入首页组件后 `page.js` 为 868629 bytes，超出 848 KiB 上限 277 bytes。先把首页面板从
+Preact 组件改成 dom-chef 直接建 DOM，省下 416 bytes，仍然超。查 git 历史发现这个数字在
+2026-07-13（`561fcca`）刚从 832 上调到 848——它是防止 bundle 无声膨胀的棘轮，不是硬约束
+（`page.js` 由扩展自带，不走网络）。按同样做法上调到 864 KiB，并在 `build/shared.js` 里
+留下三次上调的记录。再往下压就要开始删用户可见文案了，那是假节约。
+
+### 回归
+
+`npm test` 24 suites / 85 tests 通过（此前 23 / 76）；`npm run build` 零 error，
+`page.js` 868629 bytes、`settings.js` 201839 bytes；`git diff --check` 通过。
+新增 `archiveSummary.test.js` 覆盖字段泄漏、未完成同步、时间戳损坏三类。
+用 fixture 生成了一份样例离线页供用户先看新样式，生成脚本跑完即删，未留在仓库里。
+
+### 未做
+
+归档页新样式与首页入口都未经真机核对，需要重装扩展后确认；大号全量同步对账与断网零请求
+核对仍是个人归档的 open 项。
+
+### 侧栏搜索按钮在缩放时换行
+
+用户报告：缩放页面后侧栏的「搜索」按钮换到第二行，压住下面的「有爱饭友」。
+
+实机测量（真实登录态，1440×900）确认了机制：`#searchr-form` 宽 204px，输入框 159px +
+按钮 45px 恰好等于 204px，**零余量**；而 `#searchr` 的高度被写死为 36px。缩放时边框宽度
+的舍入（0.8px 记成 1 设备像素）足以让总宽超出，按钮被挤到第二行，面板高度不跟着长，
+于是溢出压住下一个面板。
+
+A/B 实证（把表单可用宽度调到 200px，只少 4px）：
+- 修复前（inline 布局）：`sameLine: false`，按钮底部超出面板 21px——精确复现用户截图。
+- 修复后（flex）：`sameLine: true`，输入框自动从 159 缩到 155，按钮仍在面板内。
+
+修复写在 `src/page/styles/20-others.less`：`#searchr-form` 改成 flex 行（默认 nowrap，
+没有换行机会），输入框 `flex: 1 1 auto; min-width: 0`（不清零的话 input 的固有最小宽度
+会让 flex 压不下去），按钮 `flex: 0 0 auto`。正常状态实测两者仍等高 26px，外观未变。
+
+### 顺带完成的真机验收
+
+同一轮登录态验证里一并确认：
+- 首页侧栏「邀请朋友加入」为 `display: none`（隐藏未删除），「本地备份」面板紧随其后。
+- 点击「设置备份文件夹」确实打开了 `settings.html#personal-archive`，且落在「工具」标签页、
+  个人归档面板存在。
+
+工具坑位：`agent-browser tab list` 只列它自己创建的标签页，后台 `chrome.tabs.create` 开出来的
+标签页不在其中。一度据此误判「点击没反应」，实际用扩展页的 `chrome.tabs.query({})` 一查，
+两次点击开出的两个 `settings.html#personal-archive` 都在。验证扩展开新标签页要用后者。

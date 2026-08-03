@@ -9,6 +9,11 @@ import createFileSystemArchiveStore from '../fsStore'
 import syncOwnTimeline from '../sync'
 import downloadArchiveMedia, { listAvailableMedia } from '../mediaDownloader'
 import buildArchiveHtml from '../buildHtml'
+import {
+  SUMMARY_STORAGE_KEY,
+  SUMMARY_STORAGE_AREA,
+  toSummary,
+} from '../archiveSummary'
 import messaging from '@settings/messaging'
 
 const handleRepository = createDirectoryHandleRepository()
@@ -38,6 +43,35 @@ export default class PersonalArchivePanel extends Component {
 
   componentDidMount() {
     this.restoreDirectory()
+  }
+
+  componentDidUpdate(previousProps, previousState) {
+    const stoppedWorking = previousState.working && !this.state.working
+    const changed = (
+      this.state.meta !== previousState.meta ||
+      this.state.directoryName !== previousState.directoryName ||
+      this.state.offlineResult !== previousState.offlineResult
+    )
+
+    // 同步中逐页写没有意义（一次全量就是几百次写），等这一轮停下来再落一次。
+    if (this.state.working || (!changed && !stoppedWorking)) return
+
+    this.publishSummary()
+  }
+
+  /**
+   * 把摘要写进 chrome.storage，供饭否首页侧栏的入口显示。
+   * 首页拿不到备份目录句柄（origin 不同），这是它唯一的信息来源。
+   */
+  publishSummary() {
+    const { meta, directoryName, offlineResult } = this.state
+    const summary = toSummary(meta, {
+      directoryName,
+      hasOfflinePages: Boolean(offlineResult),
+    })
+
+    // 写失败只影响首页那行字，不该让备份流程报错。
+    chrome.storage[SUMMARY_STORAGE_AREA].set({ [SUMMARY_STORAGE_KEY]: summary })
   }
 
   async restoreDirectory() {

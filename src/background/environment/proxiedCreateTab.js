@@ -6,10 +6,11 @@ import { PROXIED_CREATE_TAB } from '@constants'
 
 function registerHandler() {
   messaging.registerHandler(PROXIED_CREATE_TAB, payload => {
-    const { url, openInBackgroundTab = false } = payload
+    const { url, extensionPath, openInBackgroundTab = false } = payload
 
     chrome.tabs.create({
-      url,
+      // 页面层没有 chrome.runtime，扩展页地址只能在这里解析成完整 URL
+      url: extensionPath ? chrome.runtime.getURL(extensionPath) : url,
       active: !openInBackgroundTab,
     })
   })

@@ -81,6 +81,9 @@ const tabDefs = [ {
     children: <OAuthPanel />,
   }, {
     title: '个人归档',
+    options: [
+      'personal-archive',
+    ],
     children: <PersonalArchivePanel />,
   } ],
 }, {
