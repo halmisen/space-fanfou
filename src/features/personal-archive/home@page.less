@@ -1,0 +1,16 @@
+// 入口面板直接复用饭否原生的 .sect 外观（标题、间距都由站点样式提供），
+// 这里只补它没有的两处：被替换掉的原面板要藏起来，摘要那行要和站点次要文字一致。
+
+.sf-personal-archive-replaced {
+  display: none;
+}
+
+#sf-personal-archive-entry {
+  .sf-personal-archive-entry__summary {
+    color: #336;
+  }
+
+  a {
+    cursor: pointer;
+  }
+}

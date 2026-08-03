@@ -285,104 +285,89 @@ export default function buildArchiveHtml({ meta, statuses, availableMedia = new 
   return files
 }
 
-const ARCHIVE_CSS = `/* 沿用太空饭否设置页的设计 token（settings.less）与 box-shadows 的卡片参数，
-   排版形态对齐饭否时间线：浅灰底 + 白卡片 + 48px 方形头像。 */
-:root {
-  --fg: #555;
-  --strong: #333;
+/*
+ * 归档页的视觉基准是 `design-sync/bundle/pages/design-spec.html`——2026-07-13 在插件生效状态下
+ * 从真实饭否页面量出来的《太空饭否当前设计规格》。数值（#336 / #933 / #999、12px 基准、
+ * 14px/22.4px 正文、775px 容器、48px 方形头像、字体族）一律以那张表为准，不要改成设置页的 token：
+ * 设置页是插件自有页面，饭否本体是另一套配色，归档页属于后者。
+ */
+const ARCHIVE_CSS = `:root {
+  --fg: #336;
+  --link: #933;
   --muted: #999;
   --line: #eee;
-  --link: #06c;
-  --card: #fff;
-  --page: #f2f2f2;
-  --shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --page: #fff;
+  --container: 775px;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  padding: 24px 16px 64px;
+  padding: 0 16px 64px;
   background: var(--page);
   color: var(--fg);
-  font: normal 14px/1.6 "Lucida Grande", "Hevetica Neue", Hevetica, Tahoma, "Hiragino Sans GB", "Microsoft Yahei", "Wenquanyi MicroHei", sans-serif;
+  font: normal 12px/18px "Segoe UI Emoji", "Avenir Next", Avenir, "Segoe UI", "Helvetica Neue", Helvetica, sans-serif;
 }
 a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.page-header, main > section, .search { max-width: 640px; margin-left: auto; margin-right: auto; }
-
-.page-header {
-  background: var(--card);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 20px 24px;
-  margin-bottom: 20px;
+.page-header, main > section, .search, .page-footer {
+  max-width: var(--container); margin-left: auto; margin-right: auto;
 }
-.page-header h1 { margin: 0 0 6px; font-size: 20px; color: var(--strong); font-weight: bold; }
-.summary { margin: 2px 0; color: var(--muted); font-size: 12px; }
-.month-nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px;
-  padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; }
 
-.search {
-  background: var(--card);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 20px 24px;
-  margin-bottom: 20px;
-}
-.search label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.page-header { padding: 28px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.page-header h1 { margin: 0 0 6px; font-size: 24px; font-weight: bold; color: var(--fg); }
+.summary { margin: 2px 0; color: var(--muted); font-size: 12px; line-height: 18px; }
+.month-nav { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 12px;
+  font-size: 14px; line-height: 25px; }
+
+.search { margin-bottom: 24px; }
+.search label { display: block; font-size: 14px; font-weight: bold; color: var(--fg); margin-bottom: 8px; }
 .search input {
-  width: 100%; padding: 8px 10px; font-size: 14px; font-family: inherit;
-  border: 1px solid #ddd; border-radius: 4px; background: #fff; color: var(--fg);
+  width: 100%; padding: 6px 8px; font-size: 14px; line-height: 16.8px; font-family: inherit;
+  border: 1px solid #ccc; background: #fff; color: #000;
 }
-.search input:focus { outline: none; border-color: #bbb; }
+.search input:focus { outline: none; border-color: #999; }
 .search-status { font-size: 12px; color: var(--muted); min-height: 18px; margin: 10px 0 0; }
 .results { list-style: none; padding: 0; margin: 8px 0 0; }
-.results li { border-top: 1px solid var(--line); padding: 8px 0; font-size: 13px; }
+.results li { border-top: 1px solid var(--line); padding: 8px 0; font-size: 14px; line-height: 22.4px; }
 .results .meta { color: var(--muted); font-size: 12px; margin-right: 10px; }
 
-.years, .month {
-  background: var(--card);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 8px 24px 4px;
-  margin-bottom: 20px;
-}
+.years, .month { margin-bottom: 24px; }
 .years h2, .month h2 {
-  margin: 0; padding: 14px 0 12px; font-size: 13px; font-weight: bold;
-  color: var(--muted); border-bottom: 1px solid var(--line);
+  margin: 0; padding: 10px 0 8px; font-size: 14px; line-height: 18px; font-weight: bold;
+  color: var(--fg); border-bottom: 1px solid var(--line);
 }
 .count { color: var(--muted); font-size: 12px; font-weight: normal; margin-left: 8px; }
 .year-list { list-style: none; padding: 0; margin: 0; }
-.year-list li { display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 0; border-bottom: 1px solid var(--line); }
+.year-list li { display: flex; justify-content: space-between; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 25px; }
 .year-list li:last-child { border-bottom: none; }
 
-/* 一条消息，形态对齐饭否时间线：左侧头像，右侧作者 / 正文 / 元信息 */
-.status { display: grid; grid-template-columns: 48px 1fr; gap: 0 12px;
-  padding: 14px 0; border-bottom: 1px solid var(--line); }
+/* 一条消息：左 48px 方形头像，右作者 / 正文 / 元信息，与饭否时间线同构 */
+.status { display: grid; grid-template-columns: 48px 1fr; gap: 0 10px;
+  padding: 12px 0; border-bottom: 1px solid var(--line); }
 .status:last-child { border-bottom: none; }
-.status header { grid-column: 2; display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.status header { grid-column: 2; display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .avatar { grid-row: 1 / span 4; grid-column: 1;
-  width: 48px; height: 48px; border-radius: 4px; object-fit: cover; }
+  width: 48px; height: 48px; object-fit: cover; }
 .avatar--missing { background: var(--line); display: block; }
-.status .name { font-weight: bold; color: var(--strong); font-size: 13px; }
+.status .name { font-weight: bold; color: var(--link); font-size: 14px; }
 .status time { color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; }
-.text { grid-column: 2; margin: 0; color: var(--fg); font-size: 14px; line-height: 1.6;
+.text { grid-column: 2; margin: 0; color: var(--fg); font-size: 14px; line-height: 22.4px;
   word-wrap: break-word; overflow-wrap: anywhere; }
 .photo { grid-column: 2; margin: 8px 0 0; }
-.photo img { max-width: 100%; max-height: 420px; height: auto; border-radius: 4px; display: block; }
+.photo img { max-width: 100%; max-height: 420px; height: auto; display: block; }
 .photo--missing { font-size: 12px; color: var(--muted); }
-.relation { grid-column: 2; margin: 6px 0 0; padding-left: 10px;
-  border-left: 3px solid var(--line); font-size: 13px; color: var(--muted); }
-.status footer { grid-column: 2; margin-top: 6px; font-size: 12px; color: var(--muted);
+.relation { grid-column: 2; margin: 5px 0 0; padding-left: 10px;
+  border-left: 3px solid var(--line); font-size: 14px; line-height: 22.4px; color: var(--muted); }
+.status footer { grid-column: 2; margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--muted);
   display: flex; flex-wrap: wrap; gap: 12px; }
 
-.page-footer { max-width: 640px; margin: 32px auto 0; padding-top: 16px;
+.page-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line);
   font-size: 12px; color: var(--muted); text-align: center; }
 
-@media (max-width: 600px) {
-  body { padding: 12px 8px 48px; }
-  .page-header, .search, .years, .month { padding-left: 14px; padding-right: 14px; border-radius: 6px; }
+@media (max-width: 800px) {
+  body { padding: 0 12px 48px; }
   .status { grid-template-columns: 36px 1fr; gap: 0 10px; }
   .avatar { width: 36px; height: 36px; }
 }

@@ -8,6 +8,12 @@ import { SETTINGS_WRITE_ALL, CONTROL_PLACEHOLDER } from '@constants'
 
 const LAST_TAB_ID_STORAGE_KEY = 'settings/lastTabId'
 
+// 供扩展内部链接直达某个标签页，序号对应 getTabDefs 里 tabDefs 的下标
+const TAB_ID_BY_HASH = {
+  '#version-history': 3,
+  '#personal-archive': 2,
+}
+
 let tabDefs
 
 export default class App extends Component {
@@ -24,9 +30,10 @@ export default class App extends Component {
   }
 
   async init() {
-    const currentTabId = window.location.hash === '#version-history'
-      ? 3
-      : await this.readLastTabId() || 0
+    const hashTabId = TAB_ID_BY_HASH[window.location.hash]
+    const currentTabId = hashTabId === undefined
+      ? await this.readLastTabId() || 0
+      : hashTabId
 
     tabDefs = await getTabDefs()
 

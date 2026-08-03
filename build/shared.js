@@ -2,7 +2,10 @@ const path = require('path')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 const approot = require('approot')(path.resolve(__dirname, '..'))
 
-const BUNDLE_SIZE_LIMIT = 848 * 1024 // in bytes
+// 这是防止 bundle 无声膨胀的棘轮，不是硬性约束：page.js 由扩展自带，不走网络下载。
+// 每次上调都应该是「某个功能确实需要」的记录，而不是顺手放宽。
+// 832 → 848（2026-07-13）；848 → 864（2026-08-03，个人归档的首页侧栏入口）
+const BUNDLE_SIZE_LIMIT = 864 * 1024 // in bytes
 
 // 用于 jest-webpack-resolver
 const defaultArgv = {
