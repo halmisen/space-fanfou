@@ -58,9 +58,36 @@ historical references until live state confirms them.
 
 ## Core Principles
 
-- **Simplicity**: make the smallest change that fully solves the problem.
+- **Simplicity**: make the smallest change that fully solves the problem. Avoid
+  speculative abstraction, configuration, and indirection.
 - **Root cause**: no temporary or unexplained patches for non-trivial issues.
 - **Minimal impact**: preserve unrelated work and avoid unnecessary churn.
+- **Layered growth**: start from the smallest version that works end to end, then
+  add each capability on top of something that already works. Never trade a
+  working product for unfinished complexity.
+- **Decide for the long term**: do not accept a stopgap that only works for now
+  and is meant to be replaced later.
+- **Study prior art first**: look at how established products solve the problem
+  before designing one; adopt their proven patterns instead of inventing an
+  approach. This is how `docs/feature-directions.md` was derived from `nofan`.
+- **Reuse before writing**: lean on dependencies already in the project, and read
+  a library's docs and types before assuming it lacks a capability. Adding a new
+  dependency additionally needs a size argument — `build/shared.js` enforces a
+  `BUNDLE_SIZE_LIMIT` ratchet on `page.js` that has been raised three times.
+
+### Compatibility is not optional in this project
+
+A general principle "remove obsolete paths instead of adding migrations" does
+**not** apply here, and agents should not adopt it from external guides.
+
+Users run whatever version they last loaded as an unpacked extension, and their
+data lives on their own machines: `chrome.storage.local` settings, avatar match3
+records, mute lists, and personal-archive folders written to disk with a
+`meta.json` watermark. There is no deployment we control and no server-side
+backfill. Removing an old path therefore needs a migration or a version bump —
+see `CACHE_SCHEMA_VERSION` in `src/features/avatar-wallpaper/`, currently `3` —
+rather than deletion. `tasks/problems.md` tracks the related open risk that a
+changed extension ID can orphan local records.
 
 ## Project Overview
 

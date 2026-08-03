@@ -52,6 +52,34 @@ Reasoning:
 - Presets are easier to support and less likely to break layout.
 - The setting can remain user-facing without needing a backend or external font dependency.
 
+## External Agent-Guide Adoption (2026-08-03)
+
+Decision: keep `AGENTS.md` and `CLAUDE.md` as they are. Merge the reusable design
+principles from a community `AGENTS.md` into `CLAUDE.md` § Core Principles, and
+explicitly reject its "no backward compatibility" rule.
+
+Reasoning:
+
+- The candidate document is eight bullets of pure design philosophy with no
+  project-specific operational content. Replacing our files with it would delete
+  the only record of the four-layer runtime model, the reload matrix, the command
+  set, the control-plane read order, and the verification gates — none of which
+  are recoverable by reasoning from first principles.
+- Its rule "do not preserve backward compatibility; remove obsolete paths instead
+  of adding compatibility layers, fallbacks, or migrations" is actively wrong for
+  a browser extension distributed as an unpacked folder. Users hold their own data
+  and upgrade on their own schedule; `CACHE_SCHEMA_VERSION` (now `3`) exists
+  precisely as the migration mechanism that rule would forbid.
+- Its rule "prefer established libraries" needs a local caveat: `page.js` is under
+  a size ratchet in `build/shared.js`, and the 2026-08-03 work spent real effort
+  converting a Preact component to `dom-chef` to save 416 bytes.
+- Its remaining rules (simplicity, layered growth, modularity, long-term
+  decisions, study prior art, reuse existing dependencies) either already existed
+  in `CLAUDE.md` or are genuine additions, and were merged with the caveats above.
+
+General lesson: adopt external agent guides additively, and check each rule
+against this repository's distribution model before accepting it.
+
 ## Extension Icon Behavior
 
 Decision: clicking the Chrome extension icon should open/focus Fanfou rather than show a popup.
