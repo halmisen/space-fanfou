@@ -26,7 +26,7 @@
   },
   "options_page": "settings.html",
   "permissions": [ "tabs", "notifications", "contextMenus", "storage", "offscreen", "scripting", "alarms", "identity" ],
-  "host_permissions": [ "http://*.fanfou.com/", "https://*.fanfou.com/", "http://api.fanfou.com/", "https://api.fanfou.com/", "https://setq.me/" ],
+  "host_permissions": [ "http://*.fanfou.com/", "https://*.fanfou.com/", "http://api.fanfou.com/", "https://api.fanfou.com/", "https://setq.me/", "https://s3-img.meituan.net/", "https://s3.meituan.net/" ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
   },
