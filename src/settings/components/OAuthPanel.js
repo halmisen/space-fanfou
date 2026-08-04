@@ -96,7 +96,7 @@ export default class OAuthPanel extends Component {
 
         <div className="sf-oauth-panel__actions">
           <button type="button" disabled={!canAuthorize} onClick={this.handleAuthorize}>
-            { working ? '处理中…' : '开始授权' }
+            { working ? '处理中…' : this.getAuthorizeButtonLabel(status) }
           </button>
           <button type="button" disabled={!canClear} onClick={this.handleClear}>
             取消授权
@@ -109,6 +109,14 @@ export default class OAuthPanel extends Component {
         { error && <p className="sf-oauth-panel__error">⚠️ { error }</p> }
       </div>
     )
+  }
+
+  /**
+   * 这个按钮永远可点（换账号要靠它），所以只能用文字区分已授权与未授权。
+   * 用户看到「开始授权」一直亮着，很容易以为授权没生效。
+   */
+  getAuthorizeButtonLabel(status) {
+    return status?.hasTokens ? '重新授权（换账号）' : '开始授权'
   }
 
   getSummary(status) {
