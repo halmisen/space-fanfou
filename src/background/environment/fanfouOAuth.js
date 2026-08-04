@@ -2,6 +2,7 @@
 import OAuth from 'oauth-1.0a'
 import CryptoJS from 'crypto-js'
 import messaging from './messaging'
+import createAccountIdentityResolver from './fanfouAccountIdentity'
 import settings from './settings'
 import storage from './storage'
 import log from '@libs/log'
@@ -24,6 +25,28 @@ const TOKEN_STORAGE_KEY = 'fanfou-oauth/tokens'
 const API_HOST = 'https://api.fanfou.com'
 
 let tokenCache
+
+// consumer 每次读状态都可能变（用户改了 Consumer Key），所以按调用现场传进来。
+const identityResolver = createAccountIdentityResolver({
+  async fetchUser(tokens, consumer) {
+    const responseText = await signedRequest({
+      url: `${API_HOST}/users/show.json`,
+      method: 'GET',
+      consumerKey: consumer.consumerKey,
+      consumerSecret: consumer.consumerSecret,
+      token: {
+        key: tokens.oauthToken,
+        secret: tokens.oauthTokenSecret,
+      },
+    })
+
+    return JSON.parse(responseText)
+  },
+  saveTokens: persistTokens,
+  onError(error) {
+    log.warn('[SpaceFanfou] 读取授权账号信息失败，设置页会显示「未知」', error)
+  },
+})
 
 function createOAuthClient(consumerKey, consumerSecret) {
   return new OAuth({
@@ -48,6 +71,8 @@ async function readTokens() {
 
 async function persistTokens(tokens) {
   tokenCache = tokens || null
+  // 换了 token 就该重新查一次账号是谁，上一轮的失败不作数。
+  identityResolver.reset()
 
   if (tokens) {
     await storage.write(TOKEN_STORAGE_KEY, tokens, 'local')
@@ -228,7 +253,7 @@ async function handleGetStatus() {
     return buildStatus(consumer, null, redirectUrl)
   }
 
-  return buildStatus(consumer, tokens, redirectUrl)
+  return buildStatus(consumer, await identityResolver.ensure(tokens, consumer), redirectUrl)
 }
 
 async function handleAuthorize() {
@@ -268,11 +293,12 @@ async function handleAuthorize() {
       return { error: '获取 Access Token 失败，请确认应用配置' }
     }
 
+    // 饭否这一步不返回账号身份，下面 handleGetStatus 会补查一次并落盘。
     await persistTokens({
       oauthToken: accessTokens.oauth_token,
       oauthTokenSecret: accessTokens.oauth_token_secret,
-      screenName: accessTokens.screen_name,
-      userId: accessTokens.user_id,
+      screenName: accessTokens.screen_name || null,
+      userId: accessTokens.user_id || null,
       consumerKey: consumer.consumerKey,
     })
 
