@@ -4,6 +4,10 @@
 
 压缩规则库——每条2-3行，保留可执行规则，省略叙事背景。
 
+## 0. 退役被忽略的本地记录前先做可恢复副本
+**规则**: 删除 `.gitignore` 命中的本地任务文件前，先读取并用 `apply_patch` 迁入已跟踪 archive，再删除原路径；Git 历史不能恢复从未跟踪的版本。
+**反例**: 先删 ignored `tasks/todo.md` → 只能从已跟踪历史和其他状态文档重建概要，不能证明逐字保留。
+
 ## 1. OAuth签名基准URL必须强制HTTP
 **规则**: `fanfou.com/oauth` 和 `api.fanfou.com` 的签名基准串必须强制替换为 `http://`（后端只识别http签名）
 **反例**: 保留https → `401 Invalid signature`
