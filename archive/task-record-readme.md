@@ -1,4 +1,6 @@
-# Space Fanfou Task Records
+# Space Fanfou Archived Task Records
+
+> Historical description of the retired `tasks/` control plane. Use `../KANBAN.md` for current state.
 
 Updated: 2026-06-08T15:47:47+08:00
 Executor: codex

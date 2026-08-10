@@ -8,10 +8,11 @@ deliberately part of the public change.
 ## Start Here
 
 Before non-trivial work, check `git branch --show-current` and
-`git status --short`, then read `tasks/STATUS.md`, `tasks/todo.md`,
-`tasks/problems.md`, `tasks/logic.md`, and `tasks/lessons.md`. Preserve unrelated
-local changes. Write a checkable plan for work with multiple steps and verify
-the exact user-facing surface before calling it done.
+`git status --short`, then read `KANBAN.md`. Read the named long-task card or
+reference file only when the panel points to it. Preserve unrelated local
+changes. Write a checkable plan for work with multiple steps and verify the
+exact user-facing surface before calling it done. `KANBAN.md` is the sole
+short-term status panel; do not recreate a `tasks/` control plane.
 
 ## Project Layout
 

@@ -17,7 +17,7 @@ Primary operating contract for agents working in this repository.
 
 ### 3. Self-Improvement Loop
 
-- After a user correction, add a concrete prevention rule to `tasks/lessons.md`.
+- After a user correction, add a concrete prevention rule to `lessons.md`.
 - Review relevant lessons at session start.
 
 ### 4. Verification Before Done
@@ -37,24 +37,18 @@ Primary operating contract for agents working in this repository.
 
 ## Task Management
 
-1. Write a checkable plan in `tasks/todo.md` for non-trivial work.
-2. Confirm the plan before implementation and track progress as work proceeds.
-3. Add a review/results section with verification evidence before closing.
-4. Update `tasks/lessons.md` after user corrections.
+1. Read `KANBAN.md` as the sole short-term status panel.
+2. For short work, let the code, verification, and commit carry the record.
+3. For expensive or multi-session work, create one named long-task card with the question, frozen criteria, boundaries, resume pointer, and closure verdict; link it from `KANBAN.md` only while active.
+4. Update `KANBAN.md` only when direction, a gate, or a user decision changes.
+5. Update `lessons.md` after user corrections.
 
 ### Project Control Plane
 
-At session start, check live git state, then read these files in order:
-
-1. `tasks/STATUS.md`: current project cockpit
-2. `tasks/todo.md`: active plans and acceptance criteria
-3. `tasks/problems.md`: open risks and blockers
-4. `tasks/logic.md`: durable decisions and reasoning
-5. `tasks/lessons.md`: prevention rules from prior work
-
-Use `tasks/journal.md` for continuity history and `tasks/handoffs/` for role or
-agent handoffs. Treat dated status documents outside this control plane as
-historical references until live state confirms them.
+At session start, check live git state, then read `KANBAN.md`. Read
+`reference/risks.md`, `reference/logic.md`, `lessons.md`, or a named long-task
+card only when the current work needs them. Treat historical documents as
+context, never as proof of live state.
 
 ## Core Principles
 
@@ -86,7 +80,7 @@ records, mute lists, and personal-archive folders written to disk with a
 `meta.json` watermark. There is no deployment we control and no server-side
 backfill. Removing an old path therefore needs a migration or a version bump —
 see `CACHE_SCHEMA_VERSION` in `src/features/avatar-wallpaper/`, currently `3` —
-rather than deletion. `tasks/problems.md` tracks the related open risk that a
+rather than deletion. `reference/risks.md` tracks the related open risk that a
 changed extension ID can orphan local records.
 
 ## Project Overview

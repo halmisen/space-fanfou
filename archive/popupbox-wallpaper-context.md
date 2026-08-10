@@ -1,5 +1,7 @@
 # 饭否扩展 Bug 修复上下文报告 (交接给 Codex)
 
+> Historical context moved out of the retired `tasks/` control plane.
+
 本文件总结了近期针对饭否 Chrome 扩展项遇到的 2 个顽固 UI/注入 Bug 的背景信息、修复尝试以及失败分析。请 Codex 查阅此上下文并接手修复。
 
 ## 目标一：具体回复页面 `#PopupBox` 缺失动态图片上传按钮

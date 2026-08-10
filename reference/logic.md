@@ -1,5 +1,7 @@
 # Space Fanfou Logic
 
+> Durable reference. Current direction is in `../KANBAN.md`.
+
 Updated: 2026-07-17T16:00:59+08:00
 Executor: codex
 

@@ -1,4 +1,6 @@
-# Space Fanfou Journal
+# Space Fanfou Archived Task Journal
+
+> Historical continuity log. It is not a current status surface; use `../KANBAN.md`.
 
 ## 2026-06-08 Harness status and distribution/storage decision
 

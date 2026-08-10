@@ -1,5 +1,7 @@
 # CLAUDE.md / AGENTS.md 过时性审计与修订指令
 
+> Historical audit moved out of the retired `tasks/` control plane.
+
 - executor: claude (Fable 5)
 - run_id: docs-audit-20260717
 - timestamp: 2026-07-17

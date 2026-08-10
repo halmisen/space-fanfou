@@ -1,5 +1,7 @@
 # Space Fanfou Problems and Risks
 
+> Durable risk reference. Current priority is in `../KANBAN.md`.
+
 Updated: 2026-07-31T14:57:18+08:00
 Executor: codex
 
@@ -45,11 +47,11 @@ Status: open
 Current understanding:
 
 - `docs/project-status.md` is useful historical context, but it is not the live cockpit.
-- Live state should come from git state plus `tasks/STATUS.md`.
+- Live state should come from git state plus `../KANBAN.md`.
 
 Mitigation:
 
-- Update `tasks/STATUS.md` for current cockpit state.
+- Update `../KANBAN.md` only when current direction or a gate changes.
 - Only update `docs/project-status.md` when intentionally refreshing the dated snapshot.
 
 ## Watchlist

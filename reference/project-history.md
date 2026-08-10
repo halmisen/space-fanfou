@@ -1,4 +1,6 @@
-# Space Fanfou Status
+# Space Fanfou Historical Status
+
+> Historical snapshot migrated from the former task control plane on 2026-08-10. Live direction is in `../KANBAN.md`.
 
 Updated: 2026-08-03T15:09:54+08:00
 Executor: claude

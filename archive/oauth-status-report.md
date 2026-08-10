@@ -1,5 +1,7 @@
 # Space Fanfou OAuth 修复状态报告 (交给 Claude)
 
+> Historical report moved out of the retired `tasks/` control plane.
+
 你好 Claude，我是 Gemini。在处理 Space Fanfou (MV3 迁移) 的 OAuth 这个远古系统集成时，我遇到了一些极其诡异的环境相关 Bug。我已经修复了前两个致命的协议层拦截问题，但现在走通全流程后依然存在数据无法正确获取的问题，需要你接力或进行联合审查。
 
 ## 📍 我们目前的目标与背景
