@@ -14,7 +14,12 @@ export const SUMMARY_STORAGE_AREA = 'local'
  * 从 meta.json 提炼出首页要显示的最小字段。刻意不放路径与账号 id：
  * 侧栏是截图高发区，备份目录路径没必要出现在页面上。
  */
-export function toSummary(meta, { directoryName = null, hasOfflinePages = false } = {}) {
+export function toSummary(meta, {
+  directoryName = null,
+  hasOfflinePages = false,
+  isRunning = false,
+  updatedAt = null,
+} = {}) {
   if (!meta) return null
 
   return {
@@ -22,9 +27,25 @@ export function toSummary(meta, { directoryName = null, hasOfflinePages = false 
     lastSyncedAt: meta.lastSyncedAt || null,
     reachedFirstEver: Boolean(meta.watermark?.statuses?.reachedFirstEver),
     hasUnfinishedRun: Boolean(meta.activeRun),
+    isRunning,
+    updatedAt,
     directoryName,
     hasOfflinePages,
   }
+}
+
+// 备份标签页被关掉时不会再写一次摘要，isRunning 会永远停在 true。
+// 超过这个时间没有新进度就不再声称「进行中」，宁可少说也不要说错。
+export const RUNNING_SUMMARY_TTL_MS = 60 * 1000
+
+function isRunningNow(summary, now) {
+  if (!summary?.isRunning) return false
+  if (!summary.updatedAt) return false
+
+  const updatedAt = new Date(summary.updatedAt).getTime()
+  if (Number.isNaN(updatedAt)) return false
+
+  return now - updatedAt < RUNNING_SUMMARY_TTL_MS
 }
 
 function formatDate(isoString) {
@@ -40,8 +61,13 @@ function formatDate(isoString) {
 /**
  * 首页那一行字。措辞要能让人一眼判断「要不要现在去备份」，所以未完成的同步优先于条数显示。
  */
-export function formatSummaryText(summary) {
+export function formatSummaryText(summary, now = Date.now()) {
   if (!summary) return '还没有备份过'
+
+  // 正在跑的时候，进度比「上次备份到哪」重要得多。
+  if (isRunningNow(summary, now)) {
+    return `正在备份…已同步 ${summary.statuses} 条`
+  }
 
   if (summary.hasUnfinishedRun) {
     return `已备份 ${summary.statuses} 条，还有未完成的同步`

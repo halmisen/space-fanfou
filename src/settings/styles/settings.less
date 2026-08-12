@@ -391,6 +391,11 @@ input[type="checkbox"] {
   &__error {
     color: #b3261e;
   }
+
+  // 重试是同步仍在进行的信号，不能长得像失败
+  &__retry {
+    color: #7a5c00;
+  }
 }
 
 @media (max-width: 775px) {

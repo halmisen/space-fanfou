@@ -1,2 +1,7 @@
 dist
 design-sync
+
+# worktree 是仓库内的独立检出，各自带 node_modules 与 .eslintrc。
+# ESLint 不读 .gitignore，不在这里排除就会走进去加载它们的解析器并崩掉。
+worktrees
+.claude/worktrees

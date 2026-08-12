@@ -1,2 +1,6 @@
 dist
 src/settings/styles/ui-kit-for-chrome-extensions
+
+# 同 .eslintignore：仓库内的 worktree 会让 stylelint 重复检查同一批样式
+worktrees
+.claude/worktrees

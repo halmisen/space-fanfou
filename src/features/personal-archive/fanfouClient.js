@@ -6,7 +6,12 @@ import {
 const API_HOST = 'https://api.fanfou.com'
 
 function assertResponse(response) {
-  if (response?.error) throw new Error(response.error)
+  if (response?.error) {
+    // 带上 HTTP 状态码，同步循环据此判断这次失败值不值得重试。
+    const error = new Error(response.error)
+    error.status = response.status || null
+    throw error
+  }
   if (!response || !Object.prototype.hasOwnProperty.call(response, 'responseJSON')) {
     throw new Error('饭否 API 没有返回 JSON 数据')
   }

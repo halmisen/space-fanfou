@@ -1,4 +1,4 @@
-import { toSummary, formatSummaryText } from './archiveSummary'
+import { toSummary, formatSummaryText, RUNNING_SUMMARY_TTL_MS } from './archiveSummary'
 
 const META = {
   counts: { statuses: 23281 },
@@ -18,6 +18,8 @@ describe('toSummary', () => {
       lastSyncedAt: '2026-07-31T07:40:00.000Z',
       reachedFirstEver: true,
       hasUnfinishedRun: false,
+      isRunning: false,
+      updatedAt: null,
       directoryName: '饭否备份',
       hasOfflinePages: false,
     })
@@ -34,9 +36,11 @@ describe('toSummary', () => {
       'directoryName',
       'hasOfflinePages',
       'hasUnfinishedRun',
+      'isRunning',
       'lastSyncedAt',
       'reachedFirstEver',
       'statuses',
+      'updatedAt',
     ])
   })
 
@@ -70,6 +74,35 @@ describe('formatSummaryText', () => {
     })
 
     expect(text).toMatch(/^已备份 1483 条 · 2026-07-3[01]$/)
+  })
+
+  test('同步进行中时首页显示实时进度，优先于「有未完成的同步」', () => {
+    const now = Date.parse('2026-08-11T02:00:00.000Z')
+    const summary = toSummary({ ...META, activeRun: {}, counts: { statuses: 5700 } }, {
+      isRunning: true,
+      updatedAt: '2026-08-11T01:59:58.000Z',
+    })
+
+    expect(formatSummaryText(summary, now)).toBe('正在备份…已同步 5700 条')
+  })
+
+  test('进度停止刷新超过 TTL 后不再声称进行中——备份标签页可能已经被关掉', () => {
+    const updatedAt = '2026-08-11T01:59:58.000Z'
+    const stale = Date.parse(updatedAt) + RUNNING_SUMMARY_TTL_MS + 1
+    const summary = toSummary({ ...META, activeRun: {}, counts: { statuses: 5700 } }, {
+      isRunning: true,
+      updatedAt,
+    })
+
+    expect(formatSummaryText(summary, stale)).toBe('已备份 5700 条，还有未完成的同步')
+  })
+
+  test('缺少 updatedAt 的运行态不被采信', () => {
+    const summary = toSummary({ ...META, activeRun: {}, counts: { statuses: 5700 } }, {
+      isRunning: true,
+    })
+
+    expect(formatSummaryText(summary, Date.now())).toBe('已备份 5700 条，还有未完成的同步')
   })
 
   test('时间戳不可解析时退回只显示条数', () => {

@@ -1,4 +1,4 @@
-import { h, Component } from 'preact'
+import { h, Component, Fragment } from 'preact'
 import createDirectoryHandleRepository from '../directoryHandleRepository'
 import {
   queryDirectoryWritePermission,
@@ -6,6 +6,7 @@ import {
 } from '../directoryPermissions'
 import createFanfouClient from '../fanfouClient'
 import createFileSystemArchiveStore from '../fsStore'
+import isPopupContext from '../popupContext'
 import syncOwnTimeline from '../sync'
 import downloadArchiveMedia, { listAvailableMedia } from '../mediaDownloader'
 import buildArchiveHtml from '../buildHtml'
@@ -18,6 +19,8 @@ import messaging from '@settings/messaging'
 
 const handleRepository = createDirectoryHandleRepository()
 const fanfouClient = createFanfouClient(messaging)
+// 首页侧栏那行字几秒更新一次就够了，逐页写只是徒增 storage 广播。
+const SUMMARY_PUBLISH_INTERVAL_MS = 3000
 const permissionLabels = {
   unknown: '待检查',
   prompt: '需要确认',
@@ -27,6 +30,7 @@ const permissionLabels = {
 
 export default class PersonalArchivePanel extends Component {
   state = {
+    inPopup: null,
     loading: true,
     working: false,
     pauseRequested: false,
@@ -37,14 +41,29 @@ export default class PersonalArchivePanel extends Component {
     mediaProgress: null,
     offlineResult: null,
     authorization: null,
+    retryNotice: null,
     error: null,
   }
 
   directoryHandle = null
 
+  lastPublishedAt = 0
+
   componentDidMount() {
+    this.detectPopupContext()
     this.restoreDirectory()
     this.loadAuthorizedAccount()
+  }
+
+  async detectPopupContext() {
+    this.setState({ inPopup: await isPopupContext() })
+  }
+
+  handleOpenInTab = async () => {
+    await chrome.tabs.create({
+      url: chrome.runtime.getURL('settings.html#personal-archive'),
+    })
+    window.close()
   }
 
   // 备份跟着 OAuth 授权走，不跟着网页登录走。多账号用户在网页切了号以后，
@@ -65,8 +84,20 @@ export default class PersonalArchivePanel extends Component {
       this.state.offlineResult !== previousState.offlineResult
     )
 
-    // 同步中逐页写没有意义（一次全量就是几百次写），等这一轮停下来再落一次。
-    if (this.state.working || (!changed && !stoppedWorking)) return
+    // 同步中也要发布，否则首页侧栏那行字会整整二十分钟不动，看起来像卡死了。
+    // 但逐页写没必要（一次全量几百页），节流到几秒一次。
+    if (this.state.working) {
+      this.publishSummaryThrottled()
+      return
+    }
+
+    if (!changed && !stoppedWorking) return
+
+    this.publishSummary()
+  }
+
+  publishSummaryThrottled() {
+    if (Date.now() - this.lastPublishedAt < SUMMARY_PUBLISH_INTERVAL_MS) return
 
     this.publishSummary()
   }
@@ -76,10 +107,15 @@ export default class PersonalArchivePanel extends Component {
    * 首页拿不到备份目录句柄（origin 不同），这是它唯一的信息来源。
    */
   publishSummary() {
-    const { meta, directoryName, offlineResult } = this.state
+    const { meta, directoryName, offlineResult, working } = this.state
+
+    this.lastPublishedAt = Date.now()
+
     const summary = toSummary(meta, {
       directoryName,
       hasOfflinePages: Boolean(offlineResult),
+      isRunning: working,
+      updatedAt: new Date().toISOString(),
     })
 
     // 写失败只影响首页那行字，不该让备份流程报错。
@@ -149,6 +185,7 @@ export default class PersonalArchivePanel extends Component {
       working: true,
       pauseRequested: false,
       error: null,
+      retryNotice: null,
       progress: null,
     })
 
@@ -173,12 +210,18 @@ export default class PersonalArchivePanel extends Component {
         onProgress: progress => this.setState({
           progress,
           meta: progress.meta,
+          retryNotice: null,
+        }),
+        onRetry: ({ attempt, maxAttempts, delay, error }) => this.setState({
+          retryNotice: `连接不稳定，${delay / 1000} 秒后重试第 ${attempt}/${maxAttempts - 1} 次：`
+            + this.getErrorMessage(error),
         }),
       })
 
       this.setState({
         working: false,
         pauseRequested: false,
+        retryNotice: null,
         meta: result.meta,
         progress: {
           status: result.status,
@@ -186,9 +229,12 @@ export default class PersonalArchivePanel extends Component {
         },
       })
     } catch (error) {
+      // 面板里的错误文本只活在内存里，标签页一关就没了；控制台留一份才能事后回溯。
+      console.error('[SpaceFanfou] 个人归档同步中断:', error)
       this.setState({
         working: false,
         pauseRequested: false,
+        retryNotice: null,
         error: this.getErrorMessage(error),
       })
     }
@@ -260,6 +306,35 @@ export default class PersonalArchivePanel extends Component {
     return error?.message || String(error)
   }
 
+  /**
+   * 中断诊断信息全部来自 meta.json，不依赖本次页面加载的内存状态。
+   * 用户重开设置页时最需要回答的是「为什么停、停在哪」——这两个答案早就落盘了，
+   * 之前只是没有显示出来。
+   */
+  renderUnfinishedRun(activeRun) {
+    const { stopReason, stoppedAt, lastError, committedPages, nextMaxId } = activeRun
+    const reasonText = {
+      paused: '上次是你主动暂停的。',
+      error: '上次是出错中断的。',
+    }[stopReason] || '上次没有留下停止原因，可能是标签页被关闭或被浏览器回收。'
+
+    return (
+      <Fragment>
+        <li>检测到未完成同步，可从已提交水位继续。{ reasonText }</li>
+        <li>
+          上次进度：已提交 { committedPages || 0 } 页
+          { nextMaxId && `，下一页游标 ${nextMaxId}` }
+          { stoppedAt && `，停止时间 ${stoppedAt}` }。
+        </li>
+        { lastError && (
+          <li className="sf-personal-archive-panel__error">
+            上次的失败原因：{ lastError.message }
+          </li>
+        ) }
+      </Fragment>
+    )
+  }
+
   getSyncButtonLabel() {
     const { meta } = this.state
     if (meta?.activeRun) return '继续上次同步'
@@ -311,7 +386,38 @@ export default class PersonalArchivePanel extends Component {
     return ` 另有未授权域名被跳过：${summary}，请把它反馈给开发者。`
   }
 
+  // popup 里不显示任何操作按钮：能点的都是长任务或需要系统对话框，点了必然半途而废。
+  renderPopupNotice() {
+    return (
+      <div className="sf-personal-archive-panel">
+        <p>
+          备份要在<strong>独立标签页</strong>里进行。
+          现在这个窗口是点扩展图标弹出的浮层，鼠标点到别处它就会关闭，
+          关闭时正在进行的同步会立刻中断——全量备份是二十分钟起步的长任务，在这里跑不完。
+        </p>
+        <div className="sf-personal-archive-panel__actions">
+          <button type="button" onClick={this.handleOpenInTab}>
+            在新标签页中打开备份页面
+          </button>
+        </div>
+        <p className="formtip">
+          饭否首页侧栏的「本地备份」入口打开的就是独立标签页，效果一样。
+        </p>
+      </div>
+    )
+  }
+
   render() {
+    // 判定出来之前不渲染任何按钮，避免 popup 里闪出一个点了就会半途而废的「开始同步」。
+    if (this.state.inPopup === null) {
+      return (
+        <div className="sf-personal-archive-panel">
+          <p>正在准备…</p>
+        </div>
+      )
+    }
+    if (this.state.inPopup) return this.renderPopupNotice()
+
     const {
       loading,
       working,
@@ -321,6 +427,7 @@ export default class PersonalArchivePanel extends Component {
       progress,
       mediaProgress,
       offlineResult,
+      retryNotice,
       error,
     } = this.state
 
@@ -378,9 +485,11 @@ export default class PersonalArchivePanel extends Component {
             <li>已落盘消息：{ meta.counts?.statuses || 0 } 条</li>
             <li>最早水位：{ meta.watermark?.statuses?.oldestId || '尚无' }</li>
             <li>最近完成同步：{ meta.lastSyncedAt || '尚未完成全量同步' }</li>
-            { meta.activeRun && <li>检测到未完成同步，可从已提交水位继续。</li> }
+            { meta.activeRun && this.renderUnfinishedRun(meta.activeRun) }
           </ul>
         ) }
+
+        { retryNotice && <p className="sf-personal-archive-panel__retry">⏳ { retryNotice }</p> }
 
         { progress?.status === 'running' && (
           <p>

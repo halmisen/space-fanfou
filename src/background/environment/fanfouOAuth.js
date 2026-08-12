@@ -23,6 +23,7 @@ const ACCESS_TOKEN_URL = 'https://fanfou.com/oauth/access_token'
 const AUTHORIZE_URL = 'https://fanfou.com/oauth/authorize'
 const TOKEN_STORAGE_KEY = 'fanfou-oauth/tokens'
 const API_HOST = 'https://api.fanfou.com'
+const REQUEST_TIMEOUT_MS = 45000
 
 let tokenCache
 
@@ -155,7 +156,23 @@ async function signedRequest({
     fetchOptions.headers['Content-Type'] = 'application/x-www-form-urlencoded'
   }
 
-  const response = await fetch(finalUrl, fetchOptions)
+  // 没有超时的 fetch 在 TCP 层卡死时既不 resolve 也不 reject，调用方会永久挂起——
+  // 个人归档的 390 页长同步就是这样停在半路而不留任何痕迹的。
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  let response
+
+  try {
+    response = await fetch(finalUrl, { ...fetchOptions, signal: controller.signal })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`饭否 API 请求超时（${REQUEST_TIMEOUT_MS / 1000} 秒）`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+
   const text = await response.text()
 
   if (!response.ok) {
@@ -365,7 +382,9 @@ async function handleApiRequest(payload) {
     log.error('[SpaceFanfou] 调用 FanFou API 失败:', error)
     const errorMessage = error.responseText || error.message || 'API 请求失败'
 
-    return { error: errorMessage }
+    // status 必须单独带出：错误正文会顶掉 `Fanfou API 503` 这类信息，
+    // 调用方就无法区分「限流/服务端故障，值得重试」和「授权失效，重试无用」。
+    return { error: errorMessage, status: error.status || null }
   }
 }
 

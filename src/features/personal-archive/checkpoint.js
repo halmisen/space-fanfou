@@ -23,9 +23,33 @@ export function createArchiveMeta(account, now) {
       nextMaxId: null,
       startedAt: now,
       committedPages: 0,
+      stopReason: 'running',
+      stoppedAt: null,
+      lastError: null,
     },
     shards: { statuses: {} },
     counts: { statuses: 0 },
+  }
+}
+
+/**
+ * 记录这一轮为什么停下来。
+ *
+ * 没有这个字段时，「用户主动暂停」「报错中止」「标签页被回收」在磁盘上完全同形，
+ * 用户重开面板只会看到同一句「检测到未完成同步」，无法自证。
+ * 详见 tasks/card-archive-reliability.md 的 D3。
+ */
+export function markRunStopped(meta, { reason, message = null, now }) {
+  if (!meta?.activeRun) return meta
+
+  return {
+    ...meta,
+    activeRun: {
+      ...meta.activeRun,
+      stopReason: reason,
+      stoppedAt: now,
+      lastError: message ? { message, at: now } : null,
+    },
   }
 }
 
@@ -41,7 +65,18 @@ export function resumeOrStartSync(meta, account, now) {
       + '换一个空文件夹备份当前账号，或先到「API 接入」重新授权回原来的账号。',
     )
   }
-  if (meta.activeRun) return meta
+  // 续传：上一轮的停止原因已经交代过了，这一轮重新开始计时。
+  if (meta.activeRun) {
+    return {
+      ...meta,
+      activeRun: {
+        ...meta.activeRun,
+        stopReason: 'running',
+        stoppedAt: null,
+        lastError: null,
+      },
+    }
+  }
 
   const completedBackfill = meta.watermark?.statuses?.reachedFirstEver
   if (completedBackfill) {
@@ -54,6 +89,9 @@ export function resumeOrStartSync(meta, account, now) {
         stopAnchorId: meta.watermark.statuses.newestId,
         startedAt: now,
         committedPages: 0,
+        stopReason: 'running',
+        stoppedAt: null,
+        lastError: null,
       },
     }
   }
@@ -66,6 +104,9 @@ export function resumeOrStartSync(meta, account, now) {
       nextMaxId: meta.watermark?.statuses?.nextMaxId || null,
       startedAt: now,
       committedPages: 0,
+      stopReason: 'running',
+      stoppedAt: null,
+      lastError: null,
     },
   }
 }

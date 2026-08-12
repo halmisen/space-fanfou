@@ -253,6 +253,272 @@ test('a malformed API item cannot be skipped while its page cursor advances', as
   expect(meta.watermark.statuses.nextMaxId).toBeNull()
 })
 
+test('a transient connection failure retries the same page instead of ending the run', async () => {
+  const queries = []
+  const retries = []
+  const pages = [
+    [ rawStatus('2', 'Fri Jul 31 12:00:00 +0000 2026') ],
+    [],
+  ]
+  let meta = null
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage({ meta: nextMeta }) {
+      meta = nextMeta
+      return Promise.resolve(nextMeta)
+    },
+  }
+  // Service Worker 空闲回收时 messaging 抛出的正是这个错误，端口随后自动重连。
+  let failuresLeft = 2
+  const fetchPage = query => {
+    queries.push(query)
+    if (failuresLeft > 0) {
+      failuresLeft -= 1
+      return Promise.reject(new Error('Port disconnected during Service Worker sleep'))
+    }
+    return Promise.resolve(pages.shift())
+  }
+
+  const result = await syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage,
+    store,
+    sleep: () => Promise.resolve(),
+    onRetry: event => retries.push(`${event.stage}:${event.attempt}:${event.delay}`),
+    clock: () => new Date('2026-08-02T13:00:00.000Z'),
+  })
+
+  expect(retries).toEqual([ 'fetch:1:1000', 'fetch:2:2000' ])
+  expect(queries).toEqual([
+    { count: 60 },
+    { count: 60 },
+    { count: 60 },
+    { count: 60, max_id: '2' },
+  ])
+  expect(result.status).toBe('completed')
+  expect(result.meta.counts).toBeDefined()
+})
+
+test('exhausted retries record the stop reason on disk and keep the cursor intact', async () => {
+  let meta = null
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage({ meta: nextMeta }) {
+      meta = nextMeta
+      return Promise.resolve(nextMeta)
+    },
+  }
+
+  await expect(syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => Promise.reject(new Error('Failed to fetch')),
+    store,
+    sleep: () => Promise.resolve(),
+    clock: () => new Date('2026-08-02T13:00:00.000Z'),
+  })).rejects.toThrow('Failed to fetch')
+
+  expect(meta.activeRun).toMatchObject({
+    mode: 'backfill',
+    nextMaxId: null,
+    committedPages: 0,
+    stopReason: 'error',
+    stoppedAt: '2026-08-02T13:00:00.000Z',
+    lastError: { message: 'Failed to fetch', at: '2026-08-02T13:00:00.000Z' },
+  })
+  expect(meta.watermark.statuses.nextMaxId).toBeNull()
+})
+
+test('an authorization failure ends the run immediately instead of retrying', async () => {
+  const attempts = []
+  let meta = null
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage: () => Promise.reject(new Error('must not commit')),
+  }
+
+  await expect(syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => {
+      attempts.push(1)
+      const error = new Error('尚未完成授权，请先点击「开始授权」')
+      error.status = 401
+      return Promise.reject(error)
+    },
+    store,
+    sleep: () => Promise.resolve(),
+    clock: () => new Date('2026-08-02T13:00:00.000Z'),
+  })).rejects.toThrow('尚未完成授权')
+
+  expect(attempts).toHaveLength(1)
+  expect(meta.activeRun.stopReason).toBe('error')
+})
+
+test('a server-side failure is retried but a client-side one is not', async () => {
+  const statuses = []
+  const run = status => {
+    let meta = null
+    const store = {
+      readMeta: () => Promise.resolve(meta),
+      writeMeta(value) {
+        meta = value
+        return Promise.resolve()
+      },
+      commitStatusPage: () => Promise.reject(new Error('must not commit')),
+    }
+
+    return syncOwnTimeline({
+      account: { id: 'me', name: 'Me' },
+      fetchPage: () => {
+        statuses.push(status)
+        const error = new Error(`Fanfou API ${status}`)
+        error.status = status
+        return Promise.reject(error)
+      },
+      store,
+      sleep: () => Promise.resolve(),
+      clock: () => new Date('2026-08-02T13:00:00.000Z'),
+    })
+  }
+
+  await expect(run(503)).rejects.toThrow('Fanfou API 503')
+  expect(statuses.filter(item => item === 503)).toHaveLength(5)
+
+  await expect(run(400)).rejects.toThrow('Fanfou API 400')
+  expect(statuses.filter(item => item === 400)).toHaveLength(1)
+})
+
+test('a temporarily locked shard file is retried but a revoked permission is not', async () => {
+  const run = errorName => {
+    let meta = null
+    let commitAttempts = 0
+    const store = {
+      readMeta: () => Promise.resolve(meta),
+      writeMeta(value) {
+        meta = value
+        return Promise.resolve()
+      },
+      commitStatusPage() {
+        commitAttempts += 1
+        const error = new Error(`write failed: ${errorName}`)
+        error.name = errorName
+        return Promise.reject(error)
+      },
+    }
+
+    const promise = syncOwnTimeline({
+      account: { id: 'me', name: 'Me' },
+      fetchPage: () => Promise.resolve([ rawStatus('2', 'Fri Jul 31 12:00:00 +0000 2026') ]),
+      store,
+      sleep: () => Promise.resolve(),
+      clock: () => new Date('2026-08-02T13:00:00.000Z'),
+    })
+
+    return { promise, getAttempts: () => commitAttempts, getMeta: () => meta }
+  }
+
+  const locked = run('NoModificationAllowedError')
+  await expect(locked.promise).rejects.toThrow('NoModificationAllowedError')
+  expect(locked.getAttempts()).toBe(5)
+
+  const denied = run('NotAllowedError')
+  await expect(denied.promise).rejects.toThrow('NotAllowedError')
+  expect(denied.getAttempts()).toBe(1)
+  expect(denied.getMeta().activeRun.lastError.message).toBe('write failed: NotAllowedError')
+})
+
+test('a pause records why the run stopped so it can be told apart from a crash', async () => {
+  let meta = null
+  let committedPages = 0
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage({ meta: nextMeta }) {
+      meta = nextMeta
+      committedPages += 1
+      return Promise.resolve(nextMeta)
+    },
+  }
+
+  const result = await syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => Promise.resolve([
+      rawStatus('3', 'Fri Jul 31 12:00:00 +0000 2026'),
+      rawStatus('2', 'Thu Jul 30 12:00:00 +0000 2026'),
+    ]),
+    store,
+    sleep: () => Promise.resolve(),
+    shouldPause: () => committedPages === 1,
+    clock: () => new Date('2026-08-02T13:00:00.000Z'),
+  })
+
+  expect(result.status).toBe('paused')
+  expect(meta.activeRun).toMatchObject({
+    stopReason: 'paused',
+    stoppedAt: '2026-08-02T13:00:00.000Z',
+    lastError: null,
+    nextMaxId: '2',
+  })
+})
+
+test('resuming a stopped run clears the previous stop reason', async () => {
+  let meta = {
+    schemaVersion: 1,
+    archiveTimezone: 'Asia/Shanghai',
+    account: { id: 'me', name: 'Me' },
+    lastSyncedAt: null,
+    watermark: {
+      statuses: { newestId: '3', oldestId: '2', nextMaxId: '2', reachedFirstEver: false },
+    },
+    activeRun: {
+      resource: 'statuses',
+      mode: 'backfill',
+      nextMaxId: '2',
+      startedAt: '2026-08-01T13:00:00.000Z',
+      committedPages: 1,
+      stopReason: 'error',
+      stoppedAt: '2026-08-01T13:05:00.000Z',
+      lastError: { message: 'Failed to fetch', at: '2026-08-01T13:05:00.000Z' },
+    },
+    shards: { statuses: {} },
+    counts: { statuses: 2 },
+  }
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage: () => Promise.reject(new Error('must not commit')),
+  }
+
+  const result = await syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => Promise.resolve([]),
+    store,
+    sleep: () => Promise.resolve(),
+    clock: () => new Date('2026-08-02T13:00:00.000Z'),
+  })
+
+  expect(result.status).toBe('completed')
+  expect(result.meta.activeRun).toBeNull()
+  expect(result.meta.watermark.statuses.reachedFirstEver).toBe(true)
+})
+
 test('a paused run resumes from the last page that was committed to disk', async () => {
   let meta = null
   let committedPages = 0
