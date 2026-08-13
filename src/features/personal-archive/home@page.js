@@ -108,18 +108,27 @@ export default context => {
     const { year } = event.currentTarget.dataset
     if (!year || !nostalgiaNotice) return
     nostalgiaNotice.textContent = `正在打开 ${year} 年…`
-    const result = await bridge.postMessage({
-      action: PERSONAL_ARCHIVE_READ_YEAR,
-      payload: { year },
-    })
+    try {
+      const result = await bridge.postMessage({
+        action: PERSONAL_ARCHIVE_READ_YEAR,
+        payload: { year },
+      })
 
-    if (result?.__isError || result?.error) {
-      nostalgiaNotice.textContent = result?.error || '历史归档暂时无法打开'
-      return
+      if (result?.__isError || result?.error) {
+        nostalgiaNotice.textContent = result?.error || result?.message || '历史归档暂时无法打开'
+        return
+      }
+
+      if (!result?.view) {
+        nostalgiaNotice.textContent = '历史归档暂时无法打开'
+        return
+      }
+
+      renderNostalgiaTimeline(result.view)
+      nostalgiaNotice.textContent = ''
+    } catch (error) {
+      nostalgiaNotice.textContent = error?.message || '历史归档暂时无法打开'
     }
-
-    renderNostalgiaTimeline(result.view)
-    nostalgiaNotice.textContent = ''
   }
 
   function renderYears() {
