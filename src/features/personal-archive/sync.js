@@ -88,6 +88,7 @@ export async function syncStatusStream({
   shouldPause = () => false,
   onProgress = () => undefined,
   onRetry = () => undefined,
+  onCommitted = () => undefined,
 }) {
   const initialMeta = await store.readMeta()
   let meta = resumeOrStartSync(initialMeta, account, clock().toISOString(), resource)
@@ -172,6 +173,7 @@ export async function syncStatusStream({
           () => store.commitStatusPage({ resource, statuses, meta: pendingMeta }),
           { sleep, onRetry, stage: 'commit' },
         )
+        await onCommitted({ resource, statuses, meta })
       } else {
         meta = pendingMeta
         await store.writeMeta(meta)

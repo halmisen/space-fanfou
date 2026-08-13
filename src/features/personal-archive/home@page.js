@@ -6,7 +6,8 @@ import {
   formatSummaryText,
 } from './archiveSummary'
 import { isHomePage } from '@libs/pageDetect'
-import { STORAGE_CHANGED } from '@constants'
+import bridge from '@page/environment/bridge'
+import { PERSONAL_ARCHIVE_READ_YEAR, STORAGE_CHANGED } from '@constants'
 
 // 饭否侧栏那块 <div class="sect"><h2>邀请朋友加入</h2>…</div> 没有 id，
 // 只能按标题文字认。文字对不上时不动它——宁可入口出现在侧栏末尾，也不要误伤别的面板。
@@ -39,6 +40,10 @@ export default context => {
   let summaryElement = null
   let linkElement = null
   let hiddenPanel = null
+  let stream = null
+  let nostalgiaTimeline = null
+  let yearsElement = null
+  let nostalgiaNotice = null
   let latestSummary = null
   let recheckTimer = null
 
@@ -51,6 +56,83 @@ export default context => {
 
     // 页面层拿不到 chrome.runtime，扩展页地址由 background 用 getURL 解析。
     proxiedCreateTab.create({ extensionPath: SETTINGS_PATH })
+  }
+
+  function restoreLiveTimeline(event) {
+    if (event) event.preventDefault()
+    if (stream) stream.style.display = ''
+    if (nostalgiaTimeline) nostalgiaTimeline.remove()
+    nostalgiaTimeline = null
+  }
+
+  function formatStatusDate(status) {
+    const value = status?._archive?.createdAtISO || status?.created_at
+    const date = new Date(value || '')
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    })
+  }
+
+  function renderNostalgiaTimeline(view) {
+    if (!stream) return
+    restoreLiveTimeline()
+
+    const statusNodes = view.statuses.map(status => (
+      <li className="sf-nostalgia-timeline__status" key={status.id}>
+        <p className="sf-nostalgia-timeline__meta">
+          { status.user?.name || status.user?.screen_name || '饭否用户' } · { formatStatusDate(status) }
+        </p>
+        <p>{ status.text || '' }</p>
+      </li>
+    ))
+    const keywordText = view.stats.keywords.length
+      ? view.stats.keywords.map(item => `${item.word} ${item.count}`).join(' · ')
+      : '这一年没有足够的文本生成关键词'
+    nostalgiaTimeline = (
+      <section id="sf-nostalgia-timeline" className="sf-nostalgia-timeline">
+        <header>
+          <h1>{ view.year } 年的饭否</h1>
+          <p>历史快照 · { view.stats.total } 条消息 · 最常发言时段 { view.stats.peakHour == null ? '—' : `${view.stats.peakHour}:00` }</p>
+          <p className="sf-nostalgia-timeline__keywords">年度十大关键词：{ keywordText }</p>
+          <p><a href="#" onClick={restoreLiveTimeline}>← 回到现在</a></p>
+        </header>
+        <ol>{ statusNodes }</ol>
+      </section>
+    )
+    stream.style.display = 'none'
+    stream.before(nostalgiaTimeline)
+  }
+
+  async function onClickYear(event) {
+    event.preventDefault()
+    const { year } = event.currentTarget.dataset
+    if (!year || !nostalgiaNotice) return
+    nostalgiaNotice.textContent = `正在打开 ${year} 年…`
+    const result = await bridge.postMessage({
+      action: PERSONAL_ARCHIVE_READ_YEAR,
+      payload: { year },
+    })
+
+    if (result?.__isError || result?.error) {
+      nostalgiaNotice.textContent = result?.error || '历史归档暂时无法打开'
+      return
+    }
+
+    renderNostalgiaTimeline(result.view)
+    nostalgiaNotice.textContent = ''
+  }
+
+  function renderYears() {
+    if (!yearsElement) return
+    yearsElement.replaceChildren()
+    const years = latestSummary?.years || []
+    if (!years.length) {
+      yearsElement.append(<li>完成一次消息备份后，这里会出现年份。</li>)
+      return
+    }
+    for (const year of years) {
+      yearsElement.append(<li><a href="#" data-year={year} onClick={onClickYear}>{ year } 年</a></li>)
+    }
   }
 
   function renderSummary() {
@@ -68,6 +150,7 @@ export default context => {
   function applySummary(summary) {
     latestSummary = summary
     renderSummary()
+    renderYears()
   }
 
   // 设置页写完摘要后，已经打开的首页要跟着变，不必刷新页面。
@@ -83,6 +166,8 @@ export default context => {
   function createPanel() {
     summaryElement = <p className="sf-personal-archive-entry__summary">正在读取备份状态…</p>
     linkElement = <a href="#" onClick={onClickOpenSettings}>设置备份文件夹</a>
+    yearsElement = <ul className="sf-personal-archive-entry__years" />
+    nostalgiaNotice = <p className="sf-personal-archive-entry__notice" />
 
     return (
       <div id="sf-personal-archive-entry" className="sect">
@@ -90,6 +175,10 @@ export default context => {
         { summaryElement }
         <p>{ linkElement }</p>
         <p className="formtip">消息与图片只写进你自己选的本地文件夹，不上传任何服务器。</p>
+        <h2>穿越时间</h2>
+        <p className="formtip">首页默认仍是现在；选择一年后才切到本地历史快照。</p>
+        { yearsElement }
+        { nostalgiaNotice }
       </div>
     )
   }
@@ -104,6 +193,7 @@ export default context => {
       if (!sidebar) return
 
       panel = createPanel()
+      stream = select('#stream')
       const invitePanel = findInvitePanel(sidebar)
 
       if (invitePanel) {
@@ -124,6 +214,8 @@ export default context => {
       clearTimeout(recheckTimer)
       recheckTimer = null
       latestSummary = null
+      restoreLiveTimeline()
+      stream = null
 
       if (hiddenPanel) {
         hiddenPanel.classList.remove(CLASSNAME_HIDDEN)
@@ -132,7 +224,7 @@ export default context => {
 
       if (panel) {
         panel.remove()
-        panel = summaryElement = linkElement = null
+        panel = summaryElement = linkElement = yearsElement = nostalgiaNotice = null
       }
     },
   }

@@ -22,6 +22,7 @@ describe('toSummary', () => {
       updatedAt: null,
       directoryName: '饭否备份',
       hasOfflinePages: false,
+      years: [],
     })
   })
 
@@ -41,6 +42,7 @@ describe('toSummary', () => {
       'reachedFirstEver',
       'statuses',
       'updatedAt',
+      'years',
     ])
   })
 

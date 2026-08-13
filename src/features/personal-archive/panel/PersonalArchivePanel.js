@@ -13,6 +13,7 @@ import createDirectMessageStore from '../directMessageStore'
 import probeDirectMessages from '../directMessageProbe'
 import downloadArchiveMedia, { listAvailableMedia } from '../mediaDownloader'
 import buildArchiveHtml from '../buildHtml'
+import createNostalgiaCache from '../nostalgiaCache'
 import {
   SUMMARY_STORAGE_KEY,
   SUMMARY_STORAGE_AREA,
@@ -21,6 +22,7 @@ import {
 import messaging from '@settings/messaging'
 
 const handleRepository = createDirectoryHandleRepository()
+const nostalgiaCache = createNostalgiaCache()
 const fanfouClient = createFanfouClient(messaging)
 // 首页侧栏那行字几秒更新一次就够了，逐页写只是徒增 storage 广播。
 const SUMMARY_PUBLISH_INTERVAL_MS = 3000
@@ -43,6 +45,7 @@ export default class PersonalArchivePanel extends Component {
     progress: null,
     mediaProgress: null,
     offlineResult: null,
+    nostalgiaResult: null,
     dmProbeReceipt: null,
     authorization: null,
     retryNotice: null,
@@ -285,6 +288,15 @@ export default class PersonalArchivePanel extends Component {
           retryNotice: `连接不稳定，${delay / 1000} 秒后重试第 ${attempt}/${maxAttempts - 1} 次：`
             + this.getErrorMessage(error),
         }),
+        onCommitted: async ({ resource: committedResource, statuses, meta }) => {
+          if (committedResource !== 'statuses') return
+          try {
+            await nostalgiaCache.writeStatuses(statuses, meta.archiveTimezone)
+          } catch (error) {
+            // 备份文件已成功落盘；索引可从设置页重新建立，不能反过来判定备份失败。
+            console.error('[SpaceFanfou] 首页怀旧索引写入失败:', error)
+          }
+        },
       })
 
       this.setState({
@@ -391,6 +403,20 @@ export default class PersonalArchivePanel extends Component {
         photos: availableMedia.size,
       },
     })
+  })
+
+  // 已存在的本地备份早于首页怀旧缓存时，用户只需执行一次。逐月读写，避免把整库同时放进内存。
+  handleBuildNostalgiaCache = () => this.withWritableDirectory(async (store, meta) => {
+    const months = store.listStatusShards(meta)
+    let written = 0
+
+    for (const month of months) {
+      const statuses = await store.readStatusMonth(month)
+      await nostalgiaCache.writeStatuses(statuses, meta.archiveTimezone)
+      written += statuses.length
+    }
+
+    this.setState({ nostalgiaResult: { months: months.length, written } })
   })
 
   getErrorMessage(error) {
@@ -569,6 +595,7 @@ export default class PersonalArchivePanel extends Component {
       progress,
       mediaProgress,
       offlineResult,
+      nostalgiaResult,
       dmProbeReceipt,
       retryNotice,
       error,
@@ -636,6 +663,13 @@ export default class PersonalArchivePanel extends Component {
               <button
                 type="button"
                 disabled={!directoryName || working || !meta}
+                onClick={this.handleBuildNostalgiaCache}
+              >
+                建立首页怀旧索引
+              </button>
+              <button
+                type="button"
+                disabled={!directoryName || working || !meta}
                 onClick={this.handleBuildOffline}
               >
                 生成离线页面
@@ -694,6 +728,9 @@ export default class PersonalArchivePanel extends Component {
             引用了 { offlineResult.photos } 个本地图片文件。
             用文件管理器打开备份文件夹，双击 index.html 即可离线浏览。
           </p>
+        ) }
+        { nostalgiaResult && (
+          <p>首页怀旧索引已建立：{ nostalgiaResult.months } 个月，{ nostalgiaResult.written } 条消息。</p>
         ) }
         { this.renderDirectMessageProbeReceipt(dmProbeReceipt) }
         { error && <p className="sf-personal-archive-panel__error">⚠️ { error }</p> }

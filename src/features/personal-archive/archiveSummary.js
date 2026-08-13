@@ -31,6 +31,11 @@ export function toSummary(meta, {
     updatedAt,
     directoryName,
     hasOfflinePages,
+    years: Object.keys(meta.shards?.statuses || {})
+      .map(month => month.slice(0, 4))
+      .filter(year => /^\d{4}$/.test(year))
+      .filter((year, index, years) => years.indexOf(year) === index)
+      .sort((a, b) => b.localeCompare(a)),
   }
 }
 
