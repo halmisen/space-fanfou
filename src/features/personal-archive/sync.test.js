@@ -75,6 +75,120 @@ test('initial backfill commits each page before advancing an exclusive max_id cu
   })
 })
 
+test('a one-item terminal echo of the saved cursor completes a backfill without recommitting it', async () => {
+  const commits = []
+  let meta = {
+    schemaVersion: 1,
+    archiveTimezone: 'Asia/Shanghai',
+    account: { id: 'me', name: 'Me' },
+    lastSyncedAt: null,
+    watermark: {
+      statuses: {
+        newestId: '3',
+        oldestId: '1',
+        nextMaxId: '1',
+        reachedFirstEver: false,
+      },
+    },
+    activeRun: {
+      resource: 'statuses',
+      mode: 'backfill',
+      nextMaxId: '1',
+      startedAt: '2026-08-13T00:00:00.000Z',
+      committedPages: 1,
+      stopReason: 'error',
+      stoppedAt: '2026-08-13T00:01:00.000Z',
+      lastError: { message: 'Timeline pagination did not advance' },
+    },
+    shards: { statuses: {} },
+    counts: { statuses: 3 },
+  }
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage({ statuses, meta: nextMeta }) {
+      commits.push(statuses)
+      meta = nextMeta
+      return Promise.resolve(nextMeta)
+    },
+  }
+
+  const result = await syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => Promise.resolve([ rawStatus('1', 'Wed Jul 29 12:00:00 +0000 2026') ]),
+    store,
+    sleep: () => Promise.resolve(),
+    clock: () => new Date('2026-08-13T00:02:00.000Z'),
+  })
+
+  expect(commits).toEqual([])
+  expect(result.status).toBe('completed')
+  expect(result.meta.activeRun).toBeNull()
+  expect(result.meta.watermark.statuses).toEqual({
+    newestId: '3',
+    oldestId: '1',
+    nextMaxId: null,
+    reachedFirstEver: true,
+  })
+})
+
+test('a multi-item page that does not advance the saved cursor remains an error', async () => {
+  let meta = {
+    schemaVersion: 1,
+    archiveTimezone: 'Asia/Shanghai',
+    account: { id: 'me', name: 'Me' },
+    lastSyncedAt: null,
+    watermark: {
+      statuses: {
+        newestId: '3',
+        oldestId: '1',
+        nextMaxId: '1',
+        reachedFirstEver: false,
+      },
+    },
+    activeRun: {
+      resource: 'statuses',
+      mode: 'backfill',
+      nextMaxId: '1',
+      startedAt: '2026-08-13T00:00:00.000Z',
+      committedPages: 1,
+      stopReason: 'error',
+      stoppedAt: '2026-08-13T00:01:00.000Z',
+      lastError: { message: 'Timeline pagination did not advance' },
+    },
+    shards: { statuses: {} },
+    counts: { statuses: 3 },
+  }
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage: () => Promise.reject(new Error('must not commit')),
+  }
+
+  await expect(syncOwnTimeline({
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => Promise.resolve([
+      rawStatus('2', 'Thu Jul 30 12:00:00 +0000 2026'),
+      rawStatus('1', 'Wed Jul 29 12:00:00 +0000 2026'),
+    ]),
+    store,
+    sleep: () => Promise.resolve(),
+    clock: () => new Date('2026-08-13T00:02:00.000Z'),
+  })).rejects.toThrow('Timeline pagination did not advance')
+
+  expect(meta.activeRun).toMatchObject({
+    nextMaxId: '1',
+    stopReason: 'error',
+    lastError: { message: 'Timeline pagination did not advance' },
+  })
+})
+
 test('a mention stream keeps its own cursor and commits into mentions', async () => {
   let meta = {
     schemaVersion: 1,

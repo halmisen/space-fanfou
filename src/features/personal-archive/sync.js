@@ -128,7 +128,21 @@ export async function syncStatusStream({
         throw new TypeError(`${streamLabel(resource)} status is missing an id`)
       }
       const pageLastId = page[page.length - 1]?.id
-      if (!pageLastId || String(pageLastId) === String(nextMaxId || '')) {
+      if (!pageLastId) {
+        throw new Error(`${streamLabel(resource)} pagination did not advance`)
+      }
+      // `max_id` normally is exclusive. At the first-ever message, however, the
+      // API can echo that one saved cursor instead of returning an empty page.
+      // That page contains no uncommitted data and is a terminal marker, not a
+      // page that should be written again. A longer unchanged page is still a
+      // genuine pagination fault and must remain visible to the user.
+      if (String(pageLastId) === String(nextMaxId || '')) {
+        if (page.length === 1) {
+          meta = finishBackfill(meta, clock().toISOString(), resource)
+          await store.writeMeta(meta)
+          onProgress({ status: 'completed', meta })
+          return { status: 'completed', meta }
+        }
         throw new Error(`${streamLabel(resource)} pagination did not advance`)
       }
 
