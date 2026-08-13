@@ -25,15 +25,28 @@
 }
 
 .sf-nostalgia-timeline {
-  margin: 0 0 16px;
-  padding: 18px 22px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid #d9d9e5;
+  // 历史消息是首页时间线的另一种状态，不该像独立卡片那样另起一套字号和留白。
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+
+  header {
+    padding: 9px 15px;
+    border-bottom: 1px solid #eee;
+  }
 
   h1 {
     margin: 0;
     color: #335;
-    font-size: 20px;
+    font-size: 16px;
+    line-height: 18px;
+  }
+
+  header p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 20px;
   }
 
   .sf-nostalgia-timeline__keywords,
@@ -42,18 +55,25 @@
   }
 
   ol {
-    margin: 18px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .sf-nostalgia-timeline__status {
-    padding: 12px 0;
-    border-top: 1px solid #eee;
+    padding: 9px 15px;
+    border-bottom: 1px solid #eee;
   }
 
   .sf-nostalgia-timeline__status p {
-    margin: 4px 0;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
     white-space: pre-wrap;
+  }
+
+  .sf-nostalgia-timeline__status .sf-nostalgia-timeline__meta {
+    font-size: 12px;
+    line-height: 18px;
   }
 }
