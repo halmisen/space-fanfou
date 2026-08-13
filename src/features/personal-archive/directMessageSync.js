@@ -3,11 +3,22 @@ import { getConversationUserId } from './directMessageRecords'
 
 const PAGE_SIZE = 60
 const REQUEST_INTERVAL_MS = 500
+const MAX_ATTEMPTS = 5
+const RETRY_BASE_DELAY_MS = 1000
+const RETRYABLE_MESSAGE_PATTERN = /Port disconnected|Port not initialized|Failed to fetch|NetworkError|network|请求超时/i
+const RETRYABLE_ERROR_NAMES = new Set([ 'NoModificationAllowedError', 'InvalidStateError' ])
 
 const sleepDefault = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
 
 function startRun(meta, now) {
-  if (meta?.activeRun?.resource === 'directMessages') return meta
+  if (meta?.activeRun?.resource === 'directMessages') {
+    const activeRun = { ...meta.activeRun }
+    delete activeRun.stopReason
+    delete activeRun.stoppedAt
+    delete activeRun.lastError
+    return { ...meta, activeRun }
+  }
+  if (meta?.activeRun) throw new Error('另一个归档同步尚未完成，请先继续或结束它')
 
   return {
     ...(meta || {}),
@@ -19,6 +30,29 @@ function startRun(meta, now) {
       nextMessagePage: 1,
       startedAt: now,
     },
+  }
+}
+
+function isRetryable(error) {
+  if (RETRYABLE_ERROR_NAMES.has(error?.name)) return true
+  if (error?.status === 429) return true
+  if (error?.status >= 500 && error.status < 600) return true
+  if (error?.status) return false
+  return RETRYABLE_MESSAGE_PATTERN.test(error?.message || '')
+}
+
+async function withRetry(operation, { sleep, onRetry, stage }) {
+  let attempt = 0
+  while (true) {
+    try {
+      return await operation()
+    } catch (error) {
+      attempt += 1
+      if (attempt >= MAX_ATTEMPTS || !isRetryable(error)) throw error
+      const delay = RETRY_BASE_DELAY_MS * (2 ** (attempt - 1))
+      onRetry({ stage, attempt, maxAttempts: MAX_ATTEMPTS, delay, error })
+      await sleep(delay)
+    }
   }
 }
 
@@ -42,12 +76,16 @@ function finishRun(meta, now) {
   }
 }
 
-async function fetchConversationList(client) {
+async function fetchConversationList(client, { shouldPause, sleep, onRetry }) {
   const conversations = []
   const seen = new Set()
 
   for (let page = 1; page <= 200; page += 1) {
-    const items = await client.fetchDirectMessageConversationList({ count: PAGE_SIZE, page })
+    if (shouldPause()) return null
+    const items = await withRetry(
+      () => client.fetchDirectMessageConversationList({ count: PAGE_SIZE, page }),
+      { sleep, onRetry, stage: 'conversation-list' },
+    )
     if (!items.length) return conversations
 
     let newCount = 0
@@ -78,13 +116,19 @@ export default async function syncDirectMessages({
   clock = () => new Date(),
   shouldPause = () => false,
   onProgress = () => undefined,
+  onRetry = () => undefined,
 }) {
   const dmStore = createDirectMessageStore(store)
   let meta = startRun(await store.readMeta(), clock().toISOString())
   await store.writeMeta(meta)
 
   try {
-    const conversations = await fetchConversationList(client)
+    const conversations = await fetchConversationList(client, { shouldPause, sleep, onRetry })
+    if (!conversations) {
+      meta = stopRun(meta, 'paused', clock().toISOString())
+      await store.writeMeta(meta)
+      return { status: 'paused', meta }
+    }
     const resumeId = meta.activeRun.nextConversationId
     let resumeFound = !resumeId
 
@@ -95,35 +139,47 @@ export default async function syncDirectMessages({
         resumeFound = true
       }
       let pageNumber = otherUserId === resumeId ? meta.activeRun.nextMessagePage || 1 : 1
+      const seenMessageIds = new Set()
 
-      while (true) {
+      while (pageNumber <= 200) {
         if (shouldPause()) {
           meta = stopRun(meta, 'paused', clock().toISOString())
           await store.writeMeta(meta)
           return { status: 'paused', meta }
         }
 
-        const { rawMessages } = { rawMessages: await client.fetchDirectMessageConversation(otherUserId, {
-          count: PAGE_SIZE,
-          page: pageNumber,
-        }) }
+        const conversationQuery = { count: PAGE_SIZE, page: pageNumber }
+        const fetchConversation = () => client.fetchDirectMessageConversation(otherUserId, conversationQuery)
+        const rawMessages = await withRetry(
+          fetchConversation,
+          { sleep, onRetry, stage: 'conversation' },
+        )
         if (!rawMessages.length) break
+        if (rawMessages.some(message => !message?.id)) throw new TypeError('私信缺少消息 ID')
+        const newMessages = rawMessages.filter(message => !seenMessageIds.has(String(message.id)))
+        if (!newMessages.length) throw new Error('私信会话分页没有前进')
+        newMessages.forEach(message => seenMessageIds.add(String(message.id)))
 
-        const { meta: committedMeta } = await dmStore.commitConversationPage({
+        const pendingMeta = {
+          ...meta,
+          activeRun: {
+            ...meta.activeRun,
+            committedPages: (meta.activeRun.committedPages || 0) + 1,
+            nextConversationId: otherUserId,
+            nextMessagePage: pageNumber + 1,
+          },
+        }
+        const commitPage = () => dmStore.commitConversationPage({
           account,
           conversation,
-          rawMessages,
-          meta: {
-            ...meta,
-            activeRun: {
-              ...meta.activeRun,
-              committedPages: (meta.activeRun.committedPages || 0) + 1,
-              nextConversationId: otherUserId,
-              nextMessagePage: pageNumber + 1,
-            },
-          },
+          rawMessages: newMessages,
+          meta: pendingMeta,
           archivedAt: clock().toISOString(),
         })
+        const { meta: committedMeta } = await withRetry(
+          commitPage,
+          { sleep, onRetry, stage: 'commit' },
+        )
         meta = committedMeta
         onProgress({
           status: 'running',
@@ -135,6 +191,7 @@ export default async function syncDirectMessages({
         pageNumber += 1
         await sleep(REQUEST_INTERVAL_MS)
       }
+      if (pageNumber > 200) throw new Error('私信会话超过 200 页，已安全停止')
 
       meta = {
         ...meta,

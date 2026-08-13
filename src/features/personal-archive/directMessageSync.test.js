@@ -83,3 +83,85 @@ test('a conversation-list error records only its safe error message and resume s
     lastError: { message: 'request unavailable' },
   })
 })
+
+test('a transient private-message request retries before it advances the page', async () => {
+  let meta = null
+  const sleeps = []
+  const retries = []
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+  }
+  createDirectMessageStore.mockReturnValue({
+    commitConversationPage({ meta: pendingMeta }) {
+      meta = {
+        ...pendingMeta,
+        counts: { directMessages: 1 },
+        directMessages: { conversationCount: 1 },
+      }
+      return Promise.resolve({ meta })
+    },
+  })
+  const client = {
+    fetchDirectMessageConversationList: jest.fn()
+      .mockResolvedValueOnce([ conversation('a') ])
+      .mockResolvedValueOnce([]),
+    fetchDirectMessageConversation: jest.fn()
+      .mockRejectedValueOnce(new Error('network interrupted'))
+      .mockResolvedValueOnce([ message('a1') ])
+      .mockResolvedValueOnce([]),
+  }
+
+  await syncDirectMessages({
+    account: { id: 'me' }, client, store,
+    sleep: delay => {
+      sleeps.push(delay)
+      return Promise.resolve()
+    },
+    onRetry: retry => retries.push(retry.stage),
+  })
+
+  expect(retries).toEqual([ 'conversation' ])
+  expect(sleeps).toEqual([ 1000, 500 ])
+  expect(client.fetchDirectMessageConversation).toHaveBeenCalledTimes(3)
+})
+
+test('a repeated private-message page fails instead of looping forever', async () => {
+  let meta = null
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+  }
+  createDirectMessageStore.mockReturnValue({
+    commitConversationPage({ meta: pendingMeta }) {
+      meta = {
+        ...pendingMeta,
+        counts: { directMessages: 1 },
+        directMessages: { conversationCount: 1 },
+      }
+      return Promise.resolve({ meta })
+    },
+  })
+
+  await expect(syncDirectMessages({
+    account: { id: 'me' },
+    client: {
+      fetchDirectMessageConversationList: jest.fn()
+        .mockResolvedValueOnce([ conversation('a') ])
+        .mockResolvedValueOnce([]),
+      fetchDirectMessageConversation: jest.fn()
+        .mockResolvedValueOnce([ message('a1') ])
+        .mockResolvedValueOnce([ message('a1') ]),
+    },
+    store,
+    sleep: () => Promise.resolve(),
+  })).rejects.toThrow('私信会话分页没有前进')
+
+  expect(meta.activeRun).toMatchObject({ stopReason: 'error', nextConversationId: 'a', nextMessagePage: 2 })
+})
