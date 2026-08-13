@@ -40,10 +40,31 @@ test('the archive splits into one page per year plus an index and assets', () =>
     'assets/archive.js',
     'assets/search-index.js',
     'index.html',
+    'mentions.html',
   ])
   expect(files['index.html']).toContain('<a href="2013.html">2013 年</a>')
   expect(files['2012.html']).toContain('id="s-a"')
   expect(files['2013.html']).toContain('id="s-b"')
+})
+
+test('mentions have their own overview and yearly pages with the same safe renderer', () => {
+  const files = buildArchiveHtml({
+    meta: {
+      ...meta,
+      counts: { statuses: 2, mentions: 1 },
+      watermark: { statuses: { reachedFirstEver: true }, mentions: { reachedFirstEver: true } },
+    },
+    statuses: [],
+    mentions: [ status({ id: 'mention-xss', text: '<script>alert(1)</script>' }) ],
+  })
+
+  expect(files['index.html']).toContain('<a href="mentions.html">收到的提及</a>')
+  expect(files['mentions.html']).toContain('<a href="mentions-2012.html">2012 年</a>')
+  expect(files['mentions-2012.html']).toContain('id="s-mention-xss"')
+  expect(files['mentions-2012.html']).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+  expect(files['mentions-2012.html']).toContain(
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'">`,
+  )
 })
 
 test('a month boundary follows the archive timezone, not UTC', () => {
@@ -182,6 +203,7 @@ test('an empty archive still produces a usable index', () => {
     'assets/archive.js',
     'assets/search-index.js',
     'index.html',
+    'mentions.html',
   ])
   expect(files['assets/search-index.js']).toBe('window.SF_INDEX = [];\n')
 })

@@ -7,7 +7,7 @@ import {
 import createFanfouClient from '../fanfouClient'
 import createFileSystemArchiveStore from '../fsStore'
 import isPopupContext from '../popupContext'
-import syncOwnTimeline from '../sync'
+import syncOwnTimeline, { syncStatusStream } from '../sync'
 import downloadArchiveMedia, { listAvailableMedia } from '../mediaDownloader'
 import buildArchiveHtml from '../buildHtml'
 import {
@@ -178,7 +178,23 @@ export default class PersonalArchivePanel extends Component {
     }
   }
 
-  handleStartSync = async () => {
+  handleStartSync = () => {
+    return this.handleStartStream({
+      resource: 'statuses',
+      archiveSource: 'ownTimeline',
+      fetchPage: query => fanfouClient.fetchOwnTimeline(query),
+    })
+  }
+
+  handleStartMentions = () => {
+    return this.handleStartStream({
+      resource: 'mentions',
+      archiveSource: 'mention',
+      fetchPage: query => fanfouClient.fetchMentions(query),
+    })
+  }
+
+  handleStartStream = async ({ resource, archiveSource, fetchPage }) => {
     if (!this.directoryHandle || this.state.working) return
 
     this.setState({
@@ -202,9 +218,12 @@ export default class PersonalArchivePanel extends Component {
 
       const account = await fanfouClient.fetchCurrentAccount()
       const store = createFileSystemArchiveStore(this.directoryHandle)
-      const result = await syncOwnTimeline({
+      const sync = resource === 'statuses' ? syncOwnTimeline : syncStatusStream
+      const result = await sync({
         account,
-        fetchPage: query => fanfouClient.fetchOwnTimeline(query),
+        resource,
+        archiveSource,
+        fetchPage,
         store,
         shouldPause: () => this.state.pauseRequested,
         onProgress: progress => this.setState({
@@ -225,7 +244,8 @@ export default class PersonalArchivePanel extends Component {
         meta: result.meta,
         progress: {
           status: result.status,
-          count: result.meta.counts.statuses,
+          resource,
+          count: result.meta.counts[resource] || 0,
         },
       })
     } catch (error) {
@@ -287,8 +307,9 @@ export default class PersonalArchivePanel extends Component {
 
   handleBuildOffline = () => this.withWritableDirectory(async (store, meta) => {
     const statuses = await store.readAllStatuses(meta)
+    const mentions = await store.readAllMentions(meta)
     const availableMedia = await listAvailableMedia(statuses, store, meta)
-    const files = buildArchiveHtml({ meta, statuses, availableMedia })
+    const files = buildArchiveHtml({ meta, statuses, mentions, availableMedia })
 
     for (const [ path, contents ] of Object.entries(files)) {
       await store.writeTextFile(path, contents)
@@ -337,9 +358,16 @@ export default class PersonalArchivePanel extends Component {
 
   getSyncButtonLabel() {
     const { meta } = this.state
-    if (meta?.activeRun) return '继续上次同步'
+    if (meta?.activeRun?.resource === 'statuses') return '继续上次同步'
     if (meta?.watermark?.statuses?.reachedFirstEver) return '同步新消息'
     return '开始完整同步'
+  }
+
+  getMentionButtonLabel() {
+    const { meta } = this.state
+    if (meta?.activeRun?.resource === 'mentions') return '继续提及同步'
+    if (meta?.watermark?.mentions?.reachedFirstEver) return '同步新的提及'
+    return '同步收到的提及'
   }
 
   getPermissionLabel() {
@@ -450,10 +478,17 @@ export default class PersonalArchivePanel extends Component {
               </button>
               <button
                 type="button"
-                disabled={!directoryName || working}
+                disabled={!directoryName || working || Boolean(meta?.activeRun && meta.activeRun.resource !== 'statuses')}
                 onClick={this.handleStartSync}
               >
                 { this.getSyncButtonLabel() }
+              </button>
+              <button
+                type="button"
+                disabled={!directoryName || working || Boolean(meta?.activeRun && meta.activeRun.resource !== 'mentions')}
+                onClick={this.handleStartMentions}
+              >
+                { this.getMentionButtonLabel() }
               </button>
               <button
                 type="button"
@@ -485,6 +520,8 @@ export default class PersonalArchivePanel extends Component {
             <li>已落盘消息：{ meta.counts?.statuses || 0 } 条</li>
             <li>最早水位：{ meta.watermark?.statuses?.oldestId || '尚无' }</li>
             <li>最近完成同步：{ meta.lastSyncedAt || '尚未完成全量同步' }</li>
+            <li>已落盘收到的提及：{ meta.counts?.mentions || 0 } 条</li>
+            <li>最近完成提及同步：{ meta.lastSyncedAtByResource?.mentions || '尚未完成完整同步' }</li>
             { meta.activeRun && this.renderUnfinishedRun(meta.activeRun) }
           </ul>
         ) }

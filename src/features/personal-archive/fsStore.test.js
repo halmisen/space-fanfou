@@ -123,6 +123,44 @@ test('a committed page closes every affected month shard before advancing meta',
   })
 })
 
+test('a mention page uses its own shard directory and preserves message summaries', async () => {
+  const events = []
+  const store = createFileSystemArchiveStore(createMemoryDirectoryHandle(events))
+  const statuses = [
+    normalizeStatus(rawStatus('m1', 'Fri Jul 31 12:00:00 +0000 2026', '提及'), {
+      account: { id: 'me' },
+      archiveSource: 'mention',
+      archivedAt: '2026-07-31T13:00:00.000Z',
+    }),
+  ]
+
+  const meta = await store.commitStatusPage({
+    resource: 'mentions',
+    statuses,
+    meta: {
+      schemaVersion: 1,
+      archiveTimezone: 'Asia/Shanghai',
+      shards: { statuses: { '2026-06': { count: 2 } } },
+      counts: { statuses: 2 },
+    },
+  })
+
+  expect(events).toEqual([ 'close:mentions/2026-07.json', 'close:meta.json' ])
+  expect((await store.readMentionMonth('2026-07')).map(item => item.id)).toEqual([ 'm1' ])
+  expect(meta.shards.statuses).toEqual({ '2026-06': { count: 2 } })
+  expect(meta.counts).toEqual({ statuses: 2, mentions: 1 })
+})
+
+test('a stream name cannot escape the backup directory', async () => {
+  const store = createFileSystemArchiveStore(createMemoryDirectoryHandle([]))
+
+  await expect(store.commitStatusPage({
+    resource: '../outside',
+    statuses: [],
+    meta: { archiveTimezone: 'Asia/Shanghai', shards: {}, counts: {} },
+  })).rejects.toThrow('Invalid archive resource: ../outside')
+})
+
 test('a failed meta close leaves the shard recoverable and retry remains idempotent', async () => {
   const events = []
   const failures = new Set([ 'meta.json' ])

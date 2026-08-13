@@ -42,6 +42,10 @@ function isRetryable(error) {
   return RETRYABLE_MESSAGE_PATTERN.test(error?.message || '')
 }
 
+function streamLabel(resource) {
+  return resource === 'statuses' ? 'Timeline' : 'Archive'
+}
+
 async function withRetry(operation, { sleep, onRetry, stage }) {
   let attempt = 0
 
@@ -73,10 +77,12 @@ async function recordStop(store, meta, { reason, message, now }) {
   }
 }
 
-export default async function syncOwnTimeline({
+export async function syncStatusStream({
   account,
   fetchPage,
   store,
+  resource = 'statuses',
+  archiveSource = 'ownTimeline',
   sleep = defaultSleep,
   clock = () => new Date(),
   shouldPause = () => false,
@@ -84,7 +90,7 @@ export default async function syncOwnTimeline({
   onRetry = () => undefined,
 }) {
   const initialMeta = await store.readMeta()
-  let meta = resumeOrStartSync(initialMeta, account, clock().toISOString())
+  let meta = resumeOrStartSync(initialMeta, account, clock().toISOString(), resource)
 
   if (meta !== initialMeta) {
     await store.writeMeta(meta)
@@ -103,10 +109,10 @@ export default async function syncOwnTimeline({
       if (nextMaxId) query.max_id = nextMaxId
 
       const page = await withRetry(() => fetchPage(query), { sleep, onRetry, stage: 'fetch' })
-      if (!Array.isArray(page)) throw new TypeError('Timeline page must be an array')
+      if (!Array.isArray(page)) throw new TypeError(`${streamLabel(resource)} page must be an array`)
 
       if (page.length === 0) {
-        meta = finishBackfill(meta, clock().toISOString())
+        meta = finishBackfill(meta, clock().toISOString(), resource)
         await store.writeMeta(meta)
         onProgress({ status: 'completed', meta })
         return { status: 'completed', meta }
@@ -119,30 +125,37 @@ export default async function syncOwnTimeline({
         : -1
       const statusesToCommit = anchorIndex >= 0 ? page.slice(0, anchorIndex) : page
       if (statusesToCommit.some(status => !status?.id)) {
-        throw new TypeError('Timeline status is missing an id')
+        throw new TypeError(`${streamLabel(resource)} status is missing an id`)
       }
       const pageLastId = page[page.length - 1]?.id
       if (!pageLastId || String(pageLastId) === String(nextMaxId || '')) {
-        throw new Error('Timeline pagination did not advance')
+        throw new Error(`${streamLabel(resource)} pagination did not advance`)
       }
 
       const archivedAt = clock().toISOString()
       const statuses = statusesToCommit
         .map(status => normalizeStatus(status, {
           account,
-          archiveSource: 'ownTimeline',
+          archiveSource,
           archivedAt,
         }))
         .filter(Boolean)
 
       const incrementalCompleted = isIncremental && anchorIndex >= 0
       const pendingMeta = isIncremental
-        ? applyIncrementalPage(meta, statusesToCommit, String(pageLastId), archivedAt, incrementalCompleted)
-        : applyBackfillPage(meta, page, String(pageLastId), archivedAt)
+        ? applyIncrementalPage(
+          meta,
+          statusesToCommit,
+          String(pageLastId),
+          archivedAt,
+          incrementalCompleted,
+          resource,
+        )
+        : applyBackfillPage(meta, page, String(pageLastId), archivedAt, resource)
 
       if (statuses.length > 0) {
         meta = await withRetry(
-          () => store.commitStatusPage({ statuses, meta: pendingMeta }),
+          () => store.commitStatusPage({ resource, statuses, meta: pendingMeta }),
           { sleep, onRetry, stage: 'commit' },
         )
       } else {
@@ -153,7 +166,7 @@ export default async function syncOwnTimeline({
       onProgress({
         status: 'running',
         committedPages: meta.activeRun?.committedPages || 0,
-        count: meta.counts.statuses,
+        count: meta.counts[resource] || 0,
         nextMaxId,
         meta,
       })
@@ -173,4 +186,8 @@ export default async function syncOwnTimeline({
     })
     throw error
   }
+}
+
+export default function syncOwnTimeline(options) {
+  return syncStatusStream(options)
 }

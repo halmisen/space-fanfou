@@ -35,6 +35,8 @@ test('the archive client reuses the authorized account and OAuth API bridge', as
   })
   expect(await client.fetchOwnTimeline({ count: 60, max_id: '2' }))
     .toEqual([ { id: '2' }, { id: '1' } ])
+  expect(await client.fetchMentions({ count: 60, max_id: '2' }))
+    .toEqual([ { id: '2' }, { id: '1' } ])
   expect(messages).toEqual([
     {
       action: FANFOU_OAUTH_GET_STATUS,
@@ -53,6 +55,15 @@ test('the archive client reuses the authorized account and OAuth API bridge', as
       action: FANFOU_OAUTH_API_REQUEST,
       payload: {
         url: 'https://api.fanfou.com/statuses/user_timeline.json',
+        method: 'GET',
+        query: { count: 60, max_id: '2' },
+        responseType: 'json',
+      },
+    },
+    {
+      action: FANFOU_OAUTH_API_REQUEST,
+      payload: {
+        url: 'https://api.fanfou.com/statuses/mentions.json',
         method: 'GET',
         query: { count: 60, max_id: '2' },
         responseType: 'json',

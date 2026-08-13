@@ -5,10 +5,17 @@ import {
 } from './statusRecords'
 
 const STATUS_MONTH_PATTERN = /^\d{4}-\d{2}$/
+const STREAM_RESOURCE_PATTERN = /^[a-z][a-z0-9-]*$/
 
 function assertStatusMonth(month) {
   if (!STATUS_MONTH_PATTERN.test(month)) {
     throw new Error(`Invalid status month: ${month}`)
+  }
+}
+
+function assertStreamResource(resource) {
+  if (!STREAM_RESOURCE_PATTERN.test(resource)) {
+    throw new Error(`Invalid archive resource: ${resource}`)
   }
 }
 
@@ -61,8 +68,9 @@ function splitPath(relativePath) {
 }
 
 export default function createFileSystemArchiveStore(rootHandle) {
-  function getStatusesDirectory(create = false) {
-    return rootHandle.getDirectoryHandle('statuses', { create })
+  function getStreamDirectory(resource, create = false) {
+    assertStreamResource(resource)
+    return rootHandle.getDirectoryHandle(resource, { create })
   }
 
   async function resolveDirectory(directories, create) {
@@ -92,11 +100,11 @@ export default function createFileSystemArchiveStore(rootHandle) {
     }
   }
 
-  async function readStatusMonth(month) {
+  async function readStreamMonth(resource, month) {
     assertStatusMonth(month)
 
     try {
-      const directoryHandle = await getStatusesDirectory(false)
+      const directoryHandle = await getStreamDirectory(resource, false)
       return await readJsonFile(directoryHandle, `${month}.json`, [])
     } catch (error) {
       if (error?.name === 'NotFoundError') return []
@@ -104,10 +112,22 @@ export default function createFileSystemArchiveStore(rootHandle) {
     }
   }
 
-  async function writeStatusMonth(month, statuses) {
+  async function writeStreamMonth(resource, month, statuses) {
     assertStatusMonth(month)
-    const directoryHandle = await getStatusesDirectory(true)
+    const directoryHandle = await getStreamDirectory(resource, true)
     await writeJsonFile(directoryHandle, `${month}.json`, statuses)
+  }
+
+  function readStatusMonth(month) {
+    return readStreamMonth('statuses', month)
+  }
+
+  function writeStatusMonth(month, statuses) {
+    return writeStreamMonth('statuses', month, statuses)
+  }
+
+  function readMentionMonth(month) {
+    return readStreamMonth('mentions', month)
   }
 
   function readMeta() {
@@ -118,17 +138,18 @@ export default function createFileSystemArchiveStore(rootHandle) {
     await writeJsonFile(rootHandle, 'meta.json', meta)
   }
 
-  async function commitStatusPage({ statuses, meta }) {
+  async function commitStatusPage({ resource = 'statuses', statuses, meta }) {
+    assertStreamResource(resource)
     const timeZone = meta.archiveTimezone || ARCHIVE_TIMEZONE
     const groupedStatuses = groupStatusesByMonth(statuses, timeZone)
     const shardSummaries = {
-      ...(meta.shards?.statuses || {}),
+      ...(meta.shards?.[resource] || {}),
     }
 
     for (const month of Object.keys(groupedStatuses)) {
-      const existingStatuses = await readStatusMonth(month)
+      const existingStatuses = await readStreamMonth(resource, month)
       const merged = mergeStatusRecords(existingStatuses, groupedStatuses[month])
-      await writeStatusMonth(month, merged.statuses)
+      await writeStreamMonth(resource, month, merged.statuses)
       shardSummaries[month] = summarizeShard(merged.statuses)
     }
 
@@ -136,11 +157,11 @@ export default function createFileSystemArchiveStore(rootHandle) {
       ...meta,
       shards: {
         ...(meta.shards || {}),
-        statuses: shardSummaries,
+        [resource]: shardSummaries,
       },
       counts: {
         ...(meta.counts || {}),
-        statuses: Object.values(shardSummaries)
+        [resource]: Object.values(shardSummaries)
           .reduce((total, shard) => total + shard.count, 0),
       },
     }
@@ -152,11 +173,23 @@ export default function createFileSystemArchiveStore(rootHandle) {
     return Object.keys(meta?.shards?.statuses || {}).sort()
   }
 
+  function listMentionShards(meta) {
+    return Object.keys(meta?.shards?.mentions || {}).sort()
+  }
+
   // 生成离线 HTML 需要全部历史消息，逐个分片读回。
   async function readAllStatuses(meta) {
     const statuses = []
     for (const month of listStatusShards(meta)) {
       statuses.push(...await readStatusMonth(month))
+    }
+    return statuses
+  }
+
+  async function readAllMentions(meta) {
+    const statuses = []
+    for (const month of listMentionShards(meta)) {
+      statuses.push(...await readMentionMonth(month))
     }
     return statuses
   }
@@ -188,9 +221,12 @@ export default function createFileSystemArchiveStore(rootHandle) {
     writeMeta,
     readStatusMonth,
     writeStatusMonth,
+    readMentionMonth,
     commitStatusPage,
     listStatusShards,
+    listMentionShards,
     readAllStatuses,
+    readAllMentions,
     writeTextFile,
     writeBinaryFile,
     fileExists,

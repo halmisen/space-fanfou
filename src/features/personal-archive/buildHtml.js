@@ -192,7 +192,12 @@ function compareNewestFirst(a, b) {
  * 总是按年分卷：index.html 是概览与跨年搜索，YYYY.html 是该年全部消息。
  * 不设体积阈值——两万条以上的单页在任何阈值下都不成立，分卷是唯一稳定形态。
  */
-export default function buildArchiveHtml({ meta, statuses, availableMedia = new Map() }) {
+export default function buildArchiveHtml({
+  meta,
+  statuses,
+  mentions = [],
+  availableMedia = new Map(),
+}) {
   const timeZone = meta?.archiveTimezone || ARCHIVE_TIMEZONE
   const years = groupByYear(statuses, timeZone)
   const sortedYears = [ ...years.keys() ].sort().reverse()
@@ -273,9 +278,67 @@ export default function buildArchiveHtml({ meta, statuses, availableMedia = new 
       '<h2>按年浏览</h2>',
       `<ul class="year-list">${yearRows}</ul>`,
       '</section>',
+      '<section class="years">',
+      '<h2>其他归档</h2>',
+      `<ul class="year-list"><li><a href="mentions.html">收到的提及</a><span class="count">${meta?.counts?.mentions || 0} 条</span></li></ul>`,
+      '</section>',
       '</main>',
     ].filter(Boolean).join('\n'),
     extraScript: '<script src="assets/search-index.js"></script>',
+  })
+
+  const mentionYears = groupByYear(mentions, timeZone)
+  const sortedMentionYears = [ ...mentionYears.keys() ].sort().reverse()
+  const mentionWatermark = meta?.watermark?.mentions || {}
+  const mentionRows = sortedMentionYears.map(year => {
+    const months = mentionYears.get(year)
+    const total = [ ...months.values() ].reduce((sum, list) => sum + list.length, 0)
+    return `<li><a href="mentions-${escapeHtml(year)}.html">${escapeHtml(year)} 年</a><span class="count">${total} 条</span></li>`
+  }).join('\n')
+
+  for (const year of sortedMentionYears) {
+    const months = mentionYears.get(year)
+    const sortedMonths = [ ...months.keys() ].sort().reverse()
+    const sections = sortedMonths.map(month => {
+      const monthStatuses = months.get(month).slice().sort(compareNewestFirst)
+      return [
+        `<section class="month" id="m-${escapeHtml(month)}">`,
+        `<h2>${escapeHtml(month)}<span class="count">${monthStatuses.length} 条</span></h2>`,
+        monthStatuses.map(status => renderStatus(status, { availableMedia, timeZone })).join('\n'),
+        '</section>',
+      ].join('\n')
+    })
+    const total = sortedMonths.reduce((sum, month) => sum + months.get(month).length, 0)
+    const monthNav = sortedMonths
+      .map(month => `<a href="#m-${escapeHtml(month)}">${escapeHtml(month)}</a>`)
+      .join('\n')
+
+    files[`mentions-${year}.html`] = page({
+      title: `${year} 年收到的提及 · 饭否归档`,
+      bodyClass: 'year-page',
+      main: [
+        '<header class="page-header">',
+        `<h1>${escapeHtml(year)} 年收到的提及</h1>`,
+        `<p class="summary">共 ${total} 条 · <a href="mentions.html">返回提及总览</a></p>`,
+        `<nav class="month-nav">${monthNav}</nav>`,
+        '</header>',
+        `<main>${sections.join('\n')}</main>`,
+      ].join('\n'),
+    })
+  }
+
+  files['mentions.html'] = page({
+    title: '收到的提及 · 饭否归档',
+    bodyClass: 'index-page',
+    main: [
+      '<header class="page-header">',
+      '<h1>收到的提及</h1>',
+      `<p class="summary">共 ${meta?.counts?.mentions || 0} 条</p>`,
+      mentionWatermark.reachedFirstEver ? '<p class="summary">已回填到最早可获取的提及。</p>' : '<p class="summary">尚未完成完整同步。</p>',
+      '<p class="summary"><a href="index.html">返回消息总览</a></p>',
+      '</header>',
+      `<main><section class="years"><h2>按年浏览</h2><ul class="year-list">${mentionRows}</ul></section></main>`,
+    ].filter(Boolean).join('\n'),
   })
 
   files['assets/search-index.js'] = `window.SF_INDEX = ${toScriptSafeJson(searchIndex)};\n`

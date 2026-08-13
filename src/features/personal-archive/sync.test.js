@@ -1,6 +1,6 @@
 /* eslint camelcase: off */
 
-import syncOwnTimeline from './sync'
+import syncOwnTimeline, { syncStatusStream } from './sync'
 
 function rawStatus(id, createdAt) {
   return {
@@ -73,6 +73,65 @@ test('initial backfill commits each page before advancing an exclusive max_id cu
     nextMaxId: null,
     reachedFirstEver: true,
   })
+})
+
+test('a mention stream keeps its own cursor and commits into mentions', async () => {
+  let meta = {
+    schemaVersion: 1,
+    archiveTimezone: 'Asia/Shanghai',
+    account: { id: 'me', name: 'Me' },
+    lastSyncedAt: '2026-07-30T13:00:00.000Z',
+    watermark: {
+      statuses: {
+        newestId: '3',
+        oldestId: '1',
+        nextMaxId: null,
+        reachedFirstEver: true,
+      },
+    },
+    activeRun: null,
+    shards: { statuses: {} },
+    counts: { statuses: 3 },
+  }
+  const resources = []
+  const store = {
+    readMeta: () => Promise.resolve(meta),
+    writeMeta(value) {
+      meta = value
+      return Promise.resolve()
+    },
+    commitStatusPage({ resource, meta: nextMeta }) {
+      resources.push(resource)
+      meta = nextMeta
+      return Promise.resolve(nextMeta)
+    },
+  }
+  const pages = [
+    [ rawStatus('m2', 'Fri Jul 31 12:00:00 +0000 2026') ],
+    [],
+  ]
+
+  const result = await syncStatusStream({
+    resource: 'mentions',
+    archiveSource: 'mention',
+    account: { id: 'me', name: 'Me' },
+    fetchPage: () => Promise.resolve(pages.shift()),
+    store,
+    sleep: () => Promise.resolve(),
+    clock: () => new Date('2026-08-02T13:00:00.000Z'),
+  })
+
+  expect(resources).toEqual([ 'mentions' ])
+  expect(result.meta.watermark.statuses.newestId).toBe('3')
+  expect(result.meta.watermark.mentions).toEqual({
+    newestId: 'm2',
+    oldestId: 'm2',
+    nextMaxId: null,
+    reachedFirstEver: true,
+  })
+  expect(result.meta.counts.mentions).toBe(0)
+  expect(result.meta.lastSyncedAt).toBe('2026-07-30T13:00:00.000Z')
+  expect(result.meta.lastSyncedAtByResource.mentions).toBe('2026-08-02T13:00:00.000Z')
 })
 
 test('a completed archive stops incremental sync at the previous newest status', async () => {

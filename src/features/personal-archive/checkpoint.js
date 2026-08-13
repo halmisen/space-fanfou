@@ -53,8 +53,35 @@ export function markRunStopped(meta, { reason, message = null, now }) {
   }
 }
 
-export function resumeOrStartSync(meta, account, now) {
-  if (!meta) return createArchiveMeta(account, now)
+function emptyWatermark() {
+  return {
+    newestId: null,
+    oldestId: null,
+    nextMaxId: null,
+    reachedFirstEver: false,
+  }
+}
+
+function getResourceWatermark(meta, resource) {
+  return meta.watermark?.[resource] || emptyWatermark()
+}
+
+export function resumeOrStartSync(meta, account, now, resource = 'statuses') {
+  if (!meta) {
+    const initialMeta = createArchiveMeta(account, now)
+    if (resource === 'statuses') return initialMeta
+
+    return {
+      ...initialMeta,
+      watermark: { ...initialMeta.watermark, [resource]: emptyWatermark() },
+      shards: { ...initialMeta.shards, [resource]: {} },
+      counts: { ...initialMeta.counts, [resource]: 0 },
+      activeRun: {
+        ...initialMeta.activeRun,
+        resource,
+      },
+    }
+  }
   if (meta.account?.id !== account.id) {
     // 这句会原样显示给用户，所以写成能直接照做的中文。
     // 多账号用户最容易撞上：网页切了账号，但 OAuth 授权还是原来那个。
@@ -65,12 +92,30 @@ export function resumeOrStartSync(meta, account, now) {
       + '换一个空文件夹备份当前账号，或先到「API 接入」重新授权回原来的账号。',
     )
   }
+  const resourceMeta = {
+    ...meta,
+    watermark: {
+      ...(meta.watermark || {}),
+      [resource]: getResourceWatermark(meta, resource),
+    },
+    shards: {
+      ...(meta.shards || {}),
+      [resource]: meta.shards?.[resource] || {},
+    },
+    counts: {
+      ...(meta.counts || {}),
+      [resource]: meta.counts?.[resource] || 0,
+    },
+  }
   // 续传：上一轮的停止原因已经交代过了，这一轮重新开始计时。
-  if (meta.activeRun) {
+  if (resourceMeta.activeRun) {
+    if (resourceMeta.activeRun.resource !== resource) {
+      throw new Error('另一个归档任务尚未完成，请先继续或结束它后再开始新的归档。')
+    }
     return {
-      ...meta,
+      ...resourceMeta,
       activeRun: {
-        ...meta.activeRun,
+        ...resourceMeta.activeRun,
         stopReason: 'running',
         stoppedAt: null,
         lastError: null,
@@ -78,15 +123,16 @@ export function resumeOrStartSync(meta, account, now) {
     }
   }
 
-  const completedBackfill = meta.watermark?.statuses?.reachedFirstEver
+  const watermark = getResourceWatermark(resourceMeta, resource)
+  const completedBackfill = watermark.reachedFirstEver
   if (completedBackfill) {
     return {
-      ...meta,
+      ...resourceMeta,
       activeRun: {
-        resource: 'statuses',
+        resource,
         mode: 'incremental',
         nextMaxId: null,
-        stopAnchorId: meta.watermark.statuses.newestId,
+        stopAnchorId: watermark.newestId,
         startedAt: now,
         committedPages: 0,
         stopReason: 'running',
@@ -97,11 +143,11 @@ export function resumeOrStartSync(meta, account, now) {
   }
 
   return {
-    ...meta,
+    ...resourceMeta,
     activeRun: {
-      resource: 'statuses',
+      resource,
       mode: 'backfill',
-      nextMaxId: meta.watermark?.statuses?.nextMaxId || null,
+      nextMaxId: watermark.nextMaxId,
       startedAt: now,
       committedPages: 0,
       stopReason: 'running',
@@ -111,14 +157,14 @@ export function resumeOrStartSync(meta, account, now) {
   }
 }
 
-export function applyBackfillPage(meta, page, nextMaxId, now) {
-  const previousWatermark = meta.watermark.statuses
+export function applyBackfillPage(meta, page, nextMaxId, now, resource = 'statuses') {
+  const previousWatermark = getResourceWatermark(meta, resource)
 
   return {
     ...meta,
     watermark: {
       ...meta.watermark,
-      statuses: {
+      [resource]: {
         ...previousWatermark,
         newestId: previousWatermark.newestId || page[0].id,
         oldestId: page[page.length - 1].id,
@@ -135,14 +181,18 @@ export function applyBackfillPage(meta, page, nextMaxId, now) {
   }
 }
 
-export function finishBackfill(meta, now) {
+export function finishBackfill(meta, now, resource = 'statuses') {
   return {
     ...meta,
-    lastSyncedAt: now,
+    lastSyncedAt: resource === 'statuses' ? now : meta.lastSyncedAt,
+    lastSyncedAtByResource: {
+      ...(meta.lastSyncedAtByResource || {}),
+      [resource]: now,
+    },
     watermark: {
       ...meta.watermark,
-      statuses: {
-        ...meta.watermark.statuses,
+      [resource]: {
+        ...getResourceWatermark(meta, resource),
         nextMaxId: null,
         reachedFirstEver: true,
       },
@@ -151,16 +201,19 @@ export function finishBackfill(meta, now) {
   }
 }
 
-export function applyIncrementalPage(meta, page, nextMaxId, now, completed) {
-  const previousWatermark = meta.watermark.statuses
+export function applyIncrementalPage(meta, page, nextMaxId, now, completed, resource = 'statuses') {
+  const previousWatermark = getResourceWatermark(meta, resource)
   const isFirstCommittedPage = (meta.activeRun?.committedPages || 0) === 0
 
   return {
     ...meta,
-    lastSyncedAt: completed ? now : meta.lastSyncedAt,
+    lastSyncedAt: completed && resource === 'statuses' ? now : meta.lastSyncedAt,
+    lastSyncedAtByResource: completed
+      ? { ...(meta.lastSyncedAtByResource || {}), [resource]: now }
+      : meta.lastSyncedAtByResource,
     watermark: {
       ...meta.watermark,
-      statuses: {
+      [resource]: {
         ...previousWatermark,
         newestId: isFirstCommittedPage && page[0]?.id
           ? page[0].id

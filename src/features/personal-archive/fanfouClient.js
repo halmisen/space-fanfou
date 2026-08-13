@@ -66,5 +66,11 @@ export default function createFanfouClient(messaging) {
       if (!Array.isArray(page)) throw new TypeError('饭否时间线 API 返回格式不正确')
       return page
     },
+
+    async fetchMentions(query) {
+      const page = await apiGet('/statuses/mentions.json', query)
+      if (!Array.isArray(page)) throw new TypeError('饭否提及 API 返回格式不正确')
+      return page
+    },
   }
 }
