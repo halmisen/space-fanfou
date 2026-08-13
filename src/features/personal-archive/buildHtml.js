@@ -212,6 +212,7 @@ export default function buildArchiveHtml({
   meta,
   statuses,
   mentions = [],
+  favorites = [],
   directMessages = [],
   availableMedia = new Map(),
 }) {
@@ -297,7 +298,7 @@ export default function buildArchiveHtml({
       '</section>',
       '<section class="years">',
       '<h2>其他归档</h2>',
-      `<ul class="year-list"><li><a href="mentions.html">收到的提及</a><span class="count">${meta?.counts?.mentions || 0} 条</span></li><li><a href="direct-messages.html">私信</a><span class="count">${meta?.counts?.directMessages || 0} 条</span></li></ul>`,
+      `<ul class="year-list"><li><a href="mentions.html">收到的提及</a><span class="count">${meta?.counts?.mentions || 0} 条</span></li><li><a href="favorites.html">收藏</a><span class="count">${meta?.counts?.favorites || 0} 条</span></li><li><a href="direct-messages.html">私信</a><span class="count">${meta?.counts?.directMessages || 0} 条</span></li></ul>`,
       '</section>',
       '</main>',
     ].filter(Boolean).join('\n'),
@@ -356,6 +357,19 @@ export default function buildArchiveHtml({
       '</header>',
       `<main><section class="years"><h2>按年浏览</h2><ul class="year-list">${mentionRows}</ul></section></main>`,
     ].filter(Boolean).join('\n'),
+  })
+
+  const sortedFavorites = favorites.slice().sort(compareNewestFirst)
+  files['favorites.html'] = page({
+    title: '收藏 · 饭否归档',
+    bodyClass: 'year-page',
+    main: [
+      '<header class="page-header">',
+      '<h1>收藏</h1>',
+      `<p class="summary">共 ${meta?.counts?.favorites || 0} 条 · <a href="index.html">返回消息总览</a></p>`,
+      '</header>',
+      `<main><section class="month"><h2>全部收藏<span class="count">${sortedFavorites.length} 条</span></h2>${sortedFavorites.map(status => renderStatus(status, { availableMedia, timeZone })).join('\n')}</section></main>`,
+    ].join('\n'),
   })
 
   const sortedDirectMessages = directMessages.slice().sort(compareNewestFirst)

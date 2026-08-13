@@ -37,6 +37,8 @@ test('the archive client reuses the authorized account and OAuth API bridge', as
     .toEqual([ { id: '2' }, { id: '1' } ])
   expect(await client.fetchMentions({ count: 60, max_id: '2' }))
     .toEqual([ { id: '2' }, { id: '1' } ])
+  expect(await client.fetchFavorites({ count: 60, max_id: '2' }))
+    .toEqual([ { id: '2' }, { id: '1' } ])
   expect(await client.fetchDirectMessageConversationList({ count: 60, page: 1 }))
     .toEqual([ { id: '2' }, { id: '1' } ])
   expect(await client.fetchDirectMessageConversation('other', { count: 60, page: 1 }))
@@ -68,6 +70,15 @@ test('the archive client reuses the authorized account and OAuth API bridge', as
       action: FANFOU_OAUTH_API_REQUEST,
       payload: {
         url: 'https://api.fanfou.com/statuses/mentions.json',
+        method: 'GET',
+        query: { count: 60, max_id: '2' },
+        responseType: 'json',
+      },
+    },
+    {
+      action: FANFOU_OAUTH_API_REQUEST,
+      payload: {
+        url: 'https://api.fanfou.com/favorites/id.json',
         method: 'GET',
         query: { count: 60, max_id: '2' },
         responseType: 'json',

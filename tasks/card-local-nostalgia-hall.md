@@ -37,8 +37,8 @@
 
 ## 3. 已冻结的设计
 
-数据目录按流拆分：`statuses/YYYY-MM.json`、`mentions/YYYY-MM.json`、`favorites/favorites.json` 和
-未来的 `direct-messages/<conversation>.json`。每条记录保留原 API 对象和 `_archive.archiveSource`；
+数据目录按流拆分：`statuses/YYYY-MM.json`、`mentions/YYYY-MM.json`、`favorites/YYYY-MM.json` 和
+`direct-messages/<conversation>.json`。每条记录保留原 API 对象和 `_archive.archiveSource`；
 `meta.json` 为每一流保存计数、水位、完成度与最后错误。离线 HTML 是静态阅读器：总览、消息、提及、
 收藏和私信为独立入口，所有内容均先转义，CSP 禁止网络。
 

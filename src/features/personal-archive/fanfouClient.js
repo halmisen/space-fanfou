@@ -73,6 +73,12 @@ export default function createFanfouClient(messaging) {
       return page
     },
 
+    async fetchFavorites(query) {
+      const page = await apiGet('/favorites/id.json', query)
+      if (!Array.isArray(page)) throw new TypeError('饭否收藏 API 返回格式不正确')
+      return page
+    },
+
     async fetchDirectMessageConversationList(query) {
       const page = await apiGet('/direct_messages/conversation_list.json', query)
       if (!Array.isArray(page)) throw new TypeError('饭否私信对话列表 API 返回格式不正确')

@@ -198,6 +198,14 @@ export default class PersonalArchivePanel extends Component {
     })
   }
 
+  handleStartFavorites = () => {
+    return this.handleStartStream({
+      resource: 'favorites',
+      archiveSource: 'favorite',
+      fetchPage: query => fanfouClient.fetchFavorites(query),
+    })
+  }
+
   handleStartDirectMessages = async () => {
     if (!this.directoryHandle || this.state.working) return
     // eslint-disable-next-line no-alert
@@ -368,9 +376,10 @@ export default class PersonalArchivePanel extends Component {
   handleBuildOffline = () => this.withWritableDirectory(async (store, meta) => {
     const statuses = await store.readAllStatuses(meta)
     const mentions = await store.readAllMentions(meta)
+    const favorites = await store.readAllFavorites(meta)
     const directMessages = await createDirectMessageStore(store).readAllDirectMessages()
     const availableMedia = await listAvailableMedia(statuses, store, meta)
-    const files = buildArchiveHtml({ meta, statuses, mentions, directMessages, availableMedia })
+    const files = buildArchiveHtml({ meta, statuses, mentions, favorites, directMessages, availableMedia })
 
     for (const [ path, contents ] of Object.entries(files)) {
       await store.writeTextFile(path, contents)
@@ -435,6 +444,13 @@ export default class PersonalArchivePanel extends Component {
     const { meta } = this.state
     if (meta?.activeRun?.resource === 'directMessages') return '继续私信同步'
     return '备份私信'
+  }
+
+  getFavoriteButtonLabel() {
+    const { meta } = this.state
+    if (meta?.activeRun?.resource === 'favorites') return '继续收藏同步'
+    if (meta?.watermark?.favorites?.reachedFirstEver) return '同步新的收藏'
+    return '同步收藏'
   }
 
   getPermissionLabel() {
@@ -591,6 +607,13 @@ export default class PersonalArchivePanel extends Component {
               </button>
               <button
                 type="button"
+                disabled={!directoryName || working || Boolean(meta?.activeRun && meta.activeRun.resource !== 'favorites')}
+                onClick={this.handleStartFavorites}
+              >
+                { this.getFavoriteButtonLabel() }
+              </button>
+              <button
+                type="button"
                 disabled={!directoryName || working || Boolean(meta?.activeRun && meta.activeRun.resource !== 'directMessages')}
                 onClick={this.handleStartDirectMessages}
               >
@@ -635,6 +658,8 @@ export default class PersonalArchivePanel extends Component {
             <li>最近完成同步：{ meta.lastSyncedAt || '尚未完成全量同步' }</li>
             <li>已落盘收到的提及：{ meta.counts?.mentions || 0 } 条</li>
             <li>最近完成提及同步：{ meta.lastSyncedAtByResource?.mentions || '尚未完成完整同步' }</li>
+            <li>已落盘收藏：{ meta.counts?.favorites || 0 } 条</li>
+            <li>最近完成收藏同步：{ meta.lastSyncedAtByResource?.favorites || '尚未完成完整同步' }</li>
             <li>已落盘私信：{ meta.counts?.directMessages || 0 } 条（{ meta.directMessages?.conversationCount || 0 } 个会话）</li>
             <li>最近完成私信同步：{ meta.lastSyncedAtByResource?.directMessages || '尚未完成完整同步' }</li>
             { meta.activeRun && this.renderUnfinishedRun(meta.activeRun) }

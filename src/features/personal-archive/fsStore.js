@@ -148,6 +148,10 @@ export default function createFileSystemArchiveStore(rootHandle) {
     return readStreamMonth('mentions', month)
   }
 
+  function readFavoriteMonth(month) {
+    return readStreamMonth('favorites', month)
+  }
+
   function readMeta() {
     return readJsonFile(rootHandle, 'meta.json', null)
   }
@@ -195,6 +199,10 @@ export default function createFileSystemArchiveStore(rootHandle) {
     return Object.keys(meta?.shards?.mentions || {}).sort()
   }
 
+  function listFavoriteShards(meta) {
+    return Object.keys(meta?.shards?.favorites || {}).sort()
+  }
+
   // 生成离线 HTML 需要全部历史消息，逐个分片读回。
   async function readAllStatuses(meta) {
     const statuses = []
@@ -208,6 +216,14 @@ export default function createFileSystemArchiveStore(rootHandle) {
     const statuses = []
     for (const month of listMentionShards(meta)) {
       statuses.push(...await readMentionMonth(month))
+    }
+    return statuses
+  }
+
+  async function readAllFavorites(meta) {
+    const statuses = []
+    for (const month of listFavoriteShards(meta)) {
+      statuses.push(...await readFavoriteMonth(month))
     }
     return statuses
   }
@@ -240,11 +256,14 @@ export default function createFileSystemArchiveStore(rootHandle) {
     readStatusMonth,
     writeStatusMonth,
     readMentionMonth,
+    readFavoriteMonth,
     commitStatusPage,
     listStatusShards,
     listMentionShards,
+    listFavoriteShards,
     readAllStatuses,
     readAllMentions,
+    readAllFavorites,
     readJsonFileAt,
     writeJsonFileAt,
     writeTextFile,
