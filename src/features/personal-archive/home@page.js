@@ -73,6 +73,12 @@ export default context => {
     })
   }
 
+  function onClickNostalgiaPage(event) {
+    event.preventDefault()
+    const { year, page } = event.currentTarget.dataset
+    openYear(year, Number(page))
+  }
+
   function renderNostalgiaTimeline(view) {
     if (!stream) return
     restoreLiveTimeline()
@@ -88,30 +94,47 @@ export default context => {
     const keywordText = view.stats.keywords.length
       ? view.stats.keywords.map(item => `${item.word} ${item.count}`).join(' · ')
       : '这一年没有足够的文本生成关键词'
+    const mentionedUserText = view.stats.mentionedUsers.length
+      ? view.stats.mentionedUsers.map(item => `@${item.name} ${item.count}`).join(' · ')
+      : '这一年没有可统计的提及'
+    const deletedNotice = view.stats.excludedDeleted
+      ? ` · 已略过 ${view.stats.excludedDeleted} 条原消息已删除的占位`
+      : ''
+    const pager = view.pagination.totalPages > 1 && (
+      <p className="sf-nostalgia-timeline__pager">
+        { view.pagination.page > 1 && (
+          <a href="#" data-year={view.year} data-page={view.pagination.page - 1} onClick={onClickNostalgiaPage}>← 更新的消息</a>
+        ) }
+        <span>第 { view.pagination.page } / { view.pagination.totalPages } 页</span>
+        { view.pagination.page < view.pagination.totalPages && (
+          <a href="#" data-year={view.year} data-page={view.pagination.page + 1} onClick={onClickNostalgiaPage}>更早 →</a>
+        ) }
+      </p>
+    )
     nostalgiaTimeline = (
       <section id="sf-nostalgia-timeline" className="sf-nostalgia-timeline">
         <header>
           <h1>{ view.year } 年的饭否</h1>
-          <p>历史快照 · { view.stats.total } 条消息 · 最常发言时段 { view.stats.peakHour == null ? '—' : `${view.stats.peakHour}:00` }</p>
+          <p>历史快照 · { view.stats.total } 条消息 · 最常发言时段 { view.stats.peakHour == null ? '—' : `${view.stats.peakHour}:00` }{ deletedNotice }</p>
           <p className="sf-nostalgia-timeline__keywords">年度十大关键词：{ keywordText }</p>
+          <p className="sf-nostalgia-timeline__keywords">年度最常提到的饭友：{ mentionedUserText }</p>
           <p><a href="#" onClick={restoreLiveTimeline}>← 回到现在</a></p>
         </header>
         <ol>{ statusNodes }</ol>
+        { pager }
       </section>
     )
     stream.style.display = 'none'
     stream.before(nostalgiaTimeline)
   }
 
-  async function onClickYear(event) {
-    event.preventDefault()
-    const { year } = event.currentTarget.dataset
+  async function openYear(year, page = 1) {
     if (!year || !nostalgiaNotice) return
-    nostalgiaNotice.textContent = `正在打开 ${year} 年…`
+    nostalgiaNotice.textContent = `正在打开 ${year} 年${page > 1 ? `（第 ${page} 页）` : ''}…`
     try {
       const result = await bridge.postMessage({
         action: PERSONAL_ARCHIVE_READ_YEAR,
-        payload: { year },
+        payload: { year, page },
       })
 
       if (result?.__isError || result?.error) {
@@ -129,6 +152,11 @@ export default context => {
     } catch (error) {
       nostalgiaNotice.textContent = error?.message || '历史归档暂时无法打开'
     }
+  }
+
+  function onClickYear(event) {
+    event.preventDefault()
+    openYear(event.currentTarget.dataset.year)
   }
 
   function renderYears() {

@@ -5,6 +5,38 @@ const STOP_WORDS = new Set([
   '有', '这', '那', '一个', '什么', '怎么', '今天', '现在', '还是', '因为', '所以',
 ])
 
+const DELETED_PLACEHOLDER = /^抱歉[，,]?(?:该(?:条)?消息)?已删除[。！!]?$/
+export const YEAR_PAGE_SIZE = 20
+
+function textOf(status) {
+  return String(status?.text || '')
+}
+
+export function isDeletedPlaceholder(status) {
+  return DELETED_PLACEHOLDER.test(textOf(status).trim())
+}
+
+function textWithoutUrlsAndMentions(status) {
+  return textOf(status)
+    .replace(/https?:\/\/\S+/g, ' ')
+    // 年度词汇来自正文；@用户名单独进入「最常提到的饭友」。
+    .replace(/@[^\s@#，。！？、:：;；,.!?()（）【】[\]<>《》]+/g, ' ')
+}
+
+function mentionedNames(status) {
+  const names = new Set()
+  const text = textOf(status).replace(/https?:\/\/\S+/g, ' ')
+  const pattern = /@([^\s@#，。！？、:：;；,.!?()（）【】[\]<>《》]+)/g
+  let match = pattern.exec(text)
+
+  while (match) {
+    names.add(match[1])
+    match = pattern.exec(text)
+  }
+
+  return names
+}
+
 function createdAt(status) {
   return status?._archive?.createdAtISO || status?.created_at || ''
 }
@@ -32,7 +64,8 @@ export function topKeywords(statuses, limit = 10) {
   const counts = new Map()
 
   for (const status of statuses || []) {
-    const text = String(status?.text || '').replace(/https?:\/\/\S+/g, ' ')
+    if (isDeletedPlaceholder(status)) continue
+    const text = textWithoutUrlsAndMentions(status)
     const words = text.match(/[\u4E00-\u9FFF]{2,}|[a-zA-Z][a-zA-Z0-9-]{1,}/g) || []
 
     for (const word of words) {
@@ -48,8 +81,32 @@ export function topKeywords(statuses, limit = 10) {
     .slice(0, limit)
 }
 
-export function buildYearView(year, statuses, timeZone = 'Asia/Shanghai') {
-  const ordered = [ ...(statuses || []) ].sort(newestFirst)
+export function topMentionedUsers(statuses, limit = 10) {
+  const counts = new Map()
+
+  for (const status of statuses || []) {
+    if (isDeletedPlaceholder(status)) continue
+    for (const name of mentionedNames(status)) {
+      counts.set(name, (counts.get(name) || 0) + 1)
+    }
+  }
+
+  return [ ...counts.entries() ]
+    .map(([ name, count ]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit)
+}
+
+export function buildYearView(year, statuses, {
+  timeZone = 'Asia/Shanghai',
+  page = 1,
+  pageSize = YEAR_PAGE_SIZE,
+} = {}) {
+  const availableStatuses = (statuses || []).filter(status => !isDeletedPlaceholder(status))
+  const ordered = [ ...availableStatuses ].sort(newestFirst)
+  const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize))
+  const currentPage = Math.min(Math.max(1, page), totalPages)
+  const firstStatus = (currentPage - 1) * pageSize
   const hourCounts = new Array(24).fill(0)
 
   for (const status of ordered) {
@@ -70,10 +127,17 @@ export function buildYearView(year, statuses, timeZone = 'Asia/Shanghai') {
 
   return {
     year: String(year),
-    statuses: ordered,
+    statuses: ordered.slice(firstStatus, firstStatus + pageSize),
+    pagination: {
+      page: currentPage,
+      pageSize,
+      totalPages,
+    },
     stats: {
       total: ordered.length,
+      excludedDeleted: (statuses || []).length - ordered.length,
       keywords: topKeywords(ordered),
+      mentionedUsers: topMentionedUsers(ordered),
       peakHour: ordered.length ? peakHour : null,
     },
   }

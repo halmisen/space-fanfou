@@ -38,6 +38,9 @@ describe('首页怀旧后台处理器', () => {
       view: { year: '2026', statuses },
     })
     expect(cache.readYear).toHaveBeenCalledWith('2026')
+    expect(buildYearView).toHaveBeenCalledWith('2026', statuses, { page: undefined })
+
+    await expect(handler({ year: '2026', page: 0 })).resolves.toEqual({ error: '页码无效' })
 
     feature.onUnload()
     expect(messaging.unregisterHandler).toHaveBeenCalledWith(PERSONAL_ARCHIVE_READ_YEAR)

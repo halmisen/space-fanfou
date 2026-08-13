@@ -8,15 +8,16 @@ import { PERSONAL_ARCHIVE_READ_YEAR } from '@constants/action-types'
 export default () => ({
   onLoad() {
     const cache = createNostalgiaCache(indexedDB)
-    messaging.registerHandler(PERSONAL_ARCHIVE_READ_YEAR, async ({ year }) => {
+    messaging.registerHandler(PERSONAL_ARCHIVE_READ_YEAR, async ({ year, page }) => {
       if (!/^\d{4}$/.test(String(year))) return { error: '年份无效' }
+      if (page != null && (!Number.isInteger(page) || page < 1)) return { error: '页码无效' }
 
       const statuses = await cache.readYear(String(year))
       if (!statuses.length) {
         return { error: '这个年份尚未建立首页怀旧索引，请在「本地备份」设置页点击「建立首页怀旧索引」。' }
       }
 
-      return { view: buildYearView(year, statuses) }
+      return { view: buildYearView(year, statuses, { page }) }
     })
   },
 

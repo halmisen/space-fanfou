@@ -39,8 +39,9 @@
   h1 {
     margin: 0;
     color: #335;
-    font-size: 16px;
-    line-height: 18px;
+    // 同首页时间线正文：年份只是这一段流的标题，不再放大成独立页面标题。
+    font-size: 14px;
+    line-height: 1.6;
   }
 
   header p {
@@ -73,6 +74,17 @@
   }
 
   .sf-nostalgia-timeline__status .sf-nostalgia-timeline__meta {
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .sf-nostalgia-timeline__pager {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 15px;
+    margin: 0;
+    color: #668;
     font-size: 12px;
     line-height: 18px;
   }
