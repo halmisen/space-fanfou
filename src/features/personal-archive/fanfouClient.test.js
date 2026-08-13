@@ -37,6 +37,10 @@ test('the archive client reuses the authorized account and OAuth API bridge', as
     .toEqual([ { id: '2' }, { id: '1' } ])
   expect(await client.fetchMentions({ count: 60, max_id: '2' }))
     .toEqual([ { id: '2' }, { id: '1' } ])
+  expect(await client.fetchDirectMessageConversationList({ count: 60, page: 1 }))
+    .toEqual([ { id: '2' }, { id: '1' } ])
+  expect(await client.fetchDirectMessageConversation('other', { count: 60, page: 1 }))
+    .toEqual([ { id: '2' }, { id: '1' } ])
   expect(messages).toEqual([
     {
       action: FANFOU_OAUTH_GET_STATUS,
@@ -66,6 +70,24 @@ test('the archive client reuses the authorized account and OAuth API bridge', as
         url: 'https://api.fanfou.com/statuses/mentions.json',
         method: 'GET',
         query: { count: 60, max_id: '2' },
+        responseType: 'json',
+      },
+    },
+    {
+      action: FANFOU_OAUTH_API_REQUEST,
+      payload: {
+        url: 'https://api.fanfou.com/direct_messages/conversation_list.json',
+        method: 'GET',
+        query: { count: 60, page: 1 },
+        responseType: 'json',
+      },
+    },
+    {
+      action: FANFOU_OAUTH_API_REQUEST,
+      payload: {
+        url: 'https://api.fanfou.com/direct_messages/conversation.json',
+        method: 'GET',
+        query: { id: 'other', count: 60, page: 1 },
         responseType: 'json',
       },
     },

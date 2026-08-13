@@ -39,6 +39,7 @@ test('the archive splits into one page per year plus an index and assets', () =>
     'assets/archive.css',
     'assets/archive.js',
     'assets/search-index.js',
+    'direct-messages.html',
     'index.html',
     'mentions.html',
   ])
@@ -65,6 +66,23 @@ test('mentions have their own overview and yearly pages with the same safe rende
   expect(files['mentions-2012.html']).toContain(
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'">`,
   )
+})
+
+test('direct messages have an offline-only reader with the same escaping rules', () => {
+  const files = buildArchiveHtml({
+    meta: { ...meta, counts: { statuses: 0, directMessages: 1 } },
+    statuses: [],
+    directMessages: [ status({
+      id: 'dm-1',
+      text: '<script>alert(1)</script>',
+      sender: { id: 'alice', name: 'Alice' },
+      _archive: { createdAtISO: '2012-06-30T15:12:03.000Z' },
+    }) ],
+  })
+
+  expect(files['index.html']).toContain('<a href="direct-messages.html">私信</a>')
+  expect(files['direct-messages.html']).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+  expect(files['direct-messages.html']).not.toContain('statuses/dm-1')
 })
 
 test('a month boundary follows the archive timezone, not UTC', () => {
@@ -202,6 +220,7 @@ test('an empty archive still produces a usable index', () => {
     'assets/archive.css',
     'assets/archive.js',
     'assets/search-index.js',
+    'direct-messages.html',
     'index.html',
     'mentions.html',
   ])

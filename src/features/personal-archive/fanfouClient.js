@@ -72,5 +72,20 @@ export default function createFanfouClient(messaging) {
       if (!Array.isArray(page)) throw new TypeError('饭否提及 API 返回格式不正确')
       return page
     },
+
+    async fetchDirectMessageConversationList(query) {
+      const page = await apiGet('/direct_messages/conversation_list.json', query)
+      if (!Array.isArray(page)) throw new TypeError('饭否私信对话列表 API 返回格式不正确')
+      return page
+    },
+
+    async fetchDirectMessageConversation(otherUserId, query) {
+      const page = await apiGet('/direct_messages/conversation.json', {
+        id: otherUserId,
+        ...query,
+      })
+      if (!Array.isArray(page)) throw new TypeError('饭否私信对话 API 返回格式不正确')
+      return page
+    },
   }
 }

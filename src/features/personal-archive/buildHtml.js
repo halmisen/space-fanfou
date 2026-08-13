@@ -138,6 +138,22 @@ function renderStatus(status, { availableMedia, timeZone }) {
   ].filter(Boolean).join('\n')
 }
 
+function renderDirectMessage(message, { timeZone }) {
+  const createdAt = message._archive?.createdAtISO || message.created_at
+  const sender = message.sender || message.user || {}
+
+  return [
+    '<article class="status direct-message">',
+    '<span class="avatar avatar--missing" aria-hidden="true"></span>',
+    '<header>',
+    `<span class="name">${escapeHtml(sender.name || sender.screen_name || sender.id || '未知发送者')}</span>`,
+    `<time datetime="${escapeHtml(createdAt)}">${escapeHtml(formatDateTime(createdAt, timeZone))}</time>`,
+    '</header>',
+    `<p class="text">${linkifyEscaped(escapeHtml(message.text || ''))}</p>`,
+    '</article>',
+  ].join('\n')
+}
+
 // source 字段有时是一段 HTML（`<a href="...">客户端</a>`）。这里取纯文本，
 // 再交给 escapeHtml——两道处理都在，任何一道单独也足以挡住注入。
 function stripTags(value) {
@@ -196,6 +212,7 @@ export default function buildArchiveHtml({
   meta,
   statuses,
   mentions = [],
+  directMessages = [],
   availableMedia = new Map(),
 }) {
   const timeZone = meta?.archiveTimezone || ARCHIVE_TIMEZONE
@@ -280,7 +297,7 @@ export default function buildArchiveHtml({
       '</section>',
       '<section class="years">',
       '<h2>其他归档</h2>',
-      `<ul class="year-list"><li><a href="mentions.html">收到的提及</a><span class="count">${meta?.counts?.mentions || 0} 条</span></li></ul>`,
+      `<ul class="year-list"><li><a href="mentions.html">收到的提及</a><span class="count">${meta?.counts?.mentions || 0} 条</span></li><li><a href="direct-messages.html">私信</a><span class="count">${meta?.counts?.directMessages || 0} 条</span></li></ul>`,
       '</section>',
       '</main>',
     ].filter(Boolean).join('\n'),
@@ -339,6 +356,20 @@ export default function buildArchiveHtml({
       '</header>',
       `<main><section class="years"><h2>按年浏览</h2><ul class="year-list">${mentionRows}</ul></section></main>`,
     ].filter(Boolean).join('\n'),
+  })
+
+  const sortedDirectMessages = directMessages.slice().sort(compareNewestFirst)
+  files['direct-messages.html'] = page({
+    title: '私信 · 饭否归档',
+    bodyClass: 'year-page',
+    main: [
+      '<header class="page-header">',
+      '<h1>私信</h1>',
+      `<p class="summary">共 ${meta?.counts?.directMessages || 0} 条 · <a href="index.html">返回消息总览</a></p>`,
+      '<p class="summary">此页仅保存在你的备份文件夹；请妥善保管该文件夹。</p>',
+      '</header>',
+      `<main><section class="month"><h2>全部私信<span class="count">${sortedDirectMessages.length} 条</span></h2>${sortedDirectMessages.map(message => renderDirectMessage(message, { timeZone })).join('\n')}</section></main>`,
+    ].join('\n'),
   })
 
   files['assets/search-index.js'] = `window.SF_INDEX = ${toScriptSafeJson(searchIndex)};\n`

@@ -100,6 +100,24 @@ export default function createFileSystemArchiveStore(rootHandle) {
     }
   }
 
+  async function readJsonFileAt(relativePath, fallback) {
+    const { directories, filename } = splitPath(relativePath)
+
+    try {
+      const directoryHandle = await resolveDirectory(directories, false)
+      return await readJsonFile(directoryHandle, filename, fallback)
+    } catch (error) {
+      if (error?.name === 'NotFoundError') return fallback
+      throw error
+    }
+  }
+
+  async function writeJsonFileAt(relativePath, value) {
+    const { directories, filename } = splitPath(relativePath)
+    const directoryHandle = await resolveDirectory(directories, true)
+    await writeJsonFile(directoryHandle, filename, value)
+  }
+
   async function readStreamMonth(resource, month) {
     assertStatusMonth(month)
 
@@ -227,6 +245,8 @@ export default function createFileSystemArchiveStore(rootHandle) {
     listMentionShards,
     readAllStatuses,
     readAllMentions,
+    readJsonFileAt,
+    writeJsonFileAt,
     writeTextFile,
     writeBinaryFile,
     fileExists,

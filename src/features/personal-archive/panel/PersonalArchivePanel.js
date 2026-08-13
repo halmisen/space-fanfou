@@ -8,6 +8,9 @@ import createFanfouClient from '../fanfouClient'
 import createFileSystemArchiveStore from '../fsStore'
 import isPopupContext from '../popupContext'
 import syncOwnTimeline, { syncStatusStream } from '../sync'
+import syncDirectMessages from '../directMessageSync'
+import createDirectMessageStore from '../directMessageStore'
+import probeDirectMessages from '../directMessageProbe'
 import downloadArchiveMedia, { listAvailableMedia } from '../mediaDownloader'
 import buildArchiveHtml from '../buildHtml'
 import {
@@ -40,6 +43,7 @@ export default class PersonalArchivePanel extends Component {
     progress: null,
     mediaProgress: null,
     offlineResult: null,
+    dmProbeReceipt: null,
     authorization: null,
     retryNotice: null,
     error: null,
@@ -194,6 +198,44 @@ export default class PersonalArchivePanel extends Component {
     })
   }
 
+  handleStartDirectMessages = async () => {
+    if (!this.directoryHandle || this.state.working) return
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('将把当前 OAuth 账号的私信保存到所选本地文件夹。私信页面没有访问控制，请确认该文件夹仅自己可访问。继续吗？')) return
+
+    this.setState({
+      working: true,
+      pauseRequested: false,
+      error: null,
+      retryNotice: null,
+      progress: null,
+    })
+
+    try {
+      const permission = await requestDirectoryWritePermission(this.directoryHandle)
+      this.setState({ permission })
+      if (permission !== 'granted') throw new Error('没有获得备份文件夹写入权限，请重新点击并允许访问')
+
+      const account = await fanfouClient.fetchCurrentAccount()
+      const result = await syncDirectMessages({
+        account,
+        client: fanfouClient,
+        store: createFileSystemArchiveStore(this.directoryHandle),
+        shouldPause: () => this.state.pauseRequested,
+        onProgress: progress => this.setState({ progress, meta: progress.meta }),
+      })
+      this.setState({
+        working: false,
+        pauseRequested: false,
+        meta: result.meta,
+        progress: { status: result.status, resource: 'directMessages', count: result.meta.counts.directMessages || 0 },
+      })
+    } catch (error) {
+      console.error('[SpaceFanfou] 私信归档同步中断:', error)
+      this.setState({ working: false, pauseRequested: false, error: this.getErrorMessage(error) })
+    }
+  }
+
   handleStartStream = async ({ resource, archiveSource, fetchPage }) => {
     if (!this.directoryHandle || this.state.working) return
 
@@ -264,6 +306,24 @@ export default class PersonalArchivePanel extends Component {
     this.setState({ pauseRequested: true })
   }
 
+  handleProbeDirectMessages = async () => {
+    if (this.state.working) return
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('将通过当前 OAuth 授权只读探测一个私信会话，不保存消息正文或账号标识。继续吗？')) return
+
+    this.setState({ working: true, error: null, dmProbeReceipt: null })
+
+    try {
+      const dmProbeReceipt = await probeDirectMessages({ client: fanfouClient })
+      this.setState({ working: false, dmProbeReceipt })
+    } catch (error) {
+      this.setState({
+        working: false,
+        error: '私信探针未能完成，请检查 OAuth 授权后重试。',
+      })
+    }
+  }
+
   // 下载图片与生成离线页面都要先拿到写权限，且必须是点击后的第一个异步动作。
   async withWritableDirectory(run) {
     if (!this.directoryHandle || this.state.working) return
@@ -308,8 +368,9 @@ export default class PersonalArchivePanel extends Component {
   handleBuildOffline = () => this.withWritableDirectory(async (store, meta) => {
     const statuses = await store.readAllStatuses(meta)
     const mentions = await store.readAllMentions(meta)
+    const directMessages = await createDirectMessageStore(store).readAllDirectMessages()
     const availableMedia = await listAvailableMedia(statuses, store, meta)
-    const files = buildArchiveHtml({ meta, statuses, mentions, availableMedia })
+    const files = buildArchiveHtml({ meta, statuses, mentions, directMessages, availableMedia })
 
     for (const [ path, contents ] of Object.entries(files)) {
       await store.writeTextFile(path, contents)
@@ -370,8 +431,45 @@ export default class PersonalArchivePanel extends Component {
     return '同步收到的提及'
   }
 
+  getDirectMessageButtonLabel() {
+    const { meta } = this.state
+    if (meta?.activeRun?.resource === 'directMessages') return '继续私信同步'
+    return '备份私信'
+  }
+
   getPermissionLabel() {
     return permissionLabels[this.state.permission] || '未知'
+  }
+
+  renderDirectMessageProbeReceipt(receipt) {
+    if (!receipt) return null
+
+    const list = receipt.conversationList
+    const sample = receipt.sampleConversation
+
+    return (
+      <div className="sf-personal-archive-panel__summary">
+        <p>私信只读探针收据（未写入备份目录）：</p>
+        <ul>
+          <li>
+            对话列表：{ list.available ? '可访问' : '不可访问' }，读取 { list.pagesFetched } 页，
+            去重 { list.uniqueConversations } 个会话
+            { list.reachedEmptyPage ? '，已到空页。' : '。' }
+            { list.errorCategory && `错误类别：${list.errorCategory}。` }
+          </li>
+          { sample && (
+            <li>
+              受控会话：读取 { sample.pagesFetched } 页，去重 { sample.uniqueMessages } 条，
+              { sample.reachedEmptyPage ? '已到空页；' : '未到空页；' }
+              { sample.matchesExpectedMessages === null
+                ? '未获得可比对的 msg_num。'
+                : sample.matchesExpectedMessages ? 'msg_num 一致。' : 'msg_num 不一致。' }
+              { sample.errorCategory && `错误类别：${sample.errorCategory}。` }
+            </li>
+          ) }
+        </ul>
+      </div>
+    )
   }
 
   /**
@@ -455,6 +553,7 @@ export default class PersonalArchivePanel extends Component {
       progress,
       mediaProgress,
       offlineResult,
+      dmProbeReceipt,
       retryNotice,
       error,
     } = this.state
@@ -492,6 +591,13 @@ export default class PersonalArchivePanel extends Component {
               </button>
               <button
                 type="button"
+                disabled={!directoryName || working || Boolean(meta?.activeRun && meta.activeRun.resource !== 'directMessages')}
+                onClick={this.handleStartDirectMessages}
+              >
+                { this.getDirectMessageButtonLabel() }
+              </button>
+              <button
+                type="button"
                 disabled={!working || pauseRequested}
                 onClick={this.handlePause}
               >
@@ -511,6 +617,13 @@ export default class PersonalArchivePanel extends Component {
               >
                 生成离线页面
               </button>
+              <button
+                type="button"
+                disabled={working}
+                onClick={this.handleProbeDirectMessages}
+              >
+                检查私信接口（不写入）
+              </button>
             </div>
           </div>
         ) }
@@ -522,6 +635,8 @@ export default class PersonalArchivePanel extends Component {
             <li>最近完成同步：{ meta.lastSyncedAt || '尚未完成全量同步' }</li>
             <li>已落盘收到的提及：{ meta.counts?.mentions || 0 } 条</li>
             <li>最近完成提及同步：{ meta.lastSyncedAtByResource?.mentions || '尚未完成完整同步' }</li>
+            <li>已落盘私信：{ meta.counts?.directMessages || 0 } 条（{ meta.directMessages?.conversationCount || 0 } 个会话）</li>
+            <li>最近完成私信同步：{ meta.lastSyncedAtByResource?.directMessages || '尚未完成完整同步' }</li>
             { meta.activeRun && this.renderUnfinishedRun(meta.activeRun) }
           </ul>
         ) }
@@ -555,6 +670,7 @@ export default class PersonalArchivePanel extends Component {
             用文件管理器打开备份文件夹，双击 index.html 即可离线浏览。
           </p>
         ) }
+        { this.renderDirectMessageProbeReceipt(dmProbeReceipt) }
         { error && <p className="sf-personal-archive-panel__error">⚠️ { error }</p> }
       </div>
     )
