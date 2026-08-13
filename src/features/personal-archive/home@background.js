@@ -1,12 +1,13 @@
 import createNostalgiaCache from './nostalgiaCache'
 import { buildYearView } from './nostalgiaView'
 import messaging from '@background/environment/messaging'
-import { PERSONAL_ARCHIVE_READ_YEAR } from '@constants'
+import { PERSONAL_ARCHIVE_READ_YEAR } from '@constants/action-types'
 
-const cache = createNostalgiaCache(indexedDB)
-
-export default {
+// 所有 feature script 都由 Subfeature 以 script(context) 调用；
+// 后台没有页面上下文，但仍必须导出工厂函数，否则整个子特性不会被创建。
+export default () => ({
   onLoad() {
+    const cache = createNostalgiaCache(indexedDB)
     messaging.registerHandler(PERSONAL_ARCHIVE_READ_YEAR, async ({ year }) => {
       if (!/^\d{4}$/.test(String(year))) return { error: '年份无效' }
 
@@ -22,4 +23,4 @@ export default {
   onUnload() {
     messaging.unregisterHandler(PERSONAL_ARCHIVE_READ_YEAR)
   },
-}
+})
