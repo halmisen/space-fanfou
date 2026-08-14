@@ -5,27 +5,46 @@ const STOP_WORDS = new Set([
   '有', '这', '那', '一个', '什么', '怎么', '今天', '现在', '还是', '因为', '所以',
 ])
 
-const DELETED_PLACEHOLDER = /^抱歉[，,]?(?:该(?:条)?消息)?已删除[。！!]?$/
+const UNAVAILABLE_STATUS = /^(?:抱歉[，,]?)?(?:(?:饭友已设置仅展示[^，。！？]{0,30}饭否)(?:[，,](?:此条饭否已不可见|原贴已被删除|(?:该(?:条)?消息)?已删除))?|此条饭否已不可见|原贴已被删除|(?:该(?:条)?消息)?已删除)[。！!]?$/
+const AUTO_GENERATED_STATUS = /^上传了新照片[。！!]?$/
 export const YEAR_PAGE_SIZE = 20
 
 function textOf(status) {
   return String(status?.text || '')
 }
 
-export function isDeletedPlaceholder(status) {
-  return DELETED_PLACEHOLDER.test(textOf(status).trim())
+export function isUnavailableStatus(status) {
+  return UNAVAILABLE_STATUS.test(textOf(status).trim())
+}
+
+function authorText(status) {
+  const text = textOf(status)
+  const repostText = textOf(status?.repost_status)
+  const withoutNestedRepost = repostText && text.endsWith(repostText)
+    ? text.slice(0, -repostText.length)
+    : text
+  const repostMarker = /(?:^|\s)RT(?:\s|$)|转@/i.exec(withoutNestedRepost)
+
+  return (repostMarker
+    ? withoutNestedRepost.slice(0, repostMarker.index)
+    : withoutNestedRepost).trim()
 }
 
 function textWithoutUrlsAndMentions(status) {
-  return textOf(status)
+  const text = authorText(status)
+  if (AUTO_GENERATED_STATUS.test(text)) return ''
+
+  return text
     .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/(?:www\.)?\b(?:[a-z0-9-]+\.)+(?:com|cn|net|org|me|cc|io|tv)(?:\/\S*)?/gi, ' ')
+    .replace(/&(?:quot|amp|lt|gt|#\d+|#x[\da-f]+);/gi, ' ')
     // 年度词汇来自正文；@用户名单独进入「最常提到的饭友」。
     .replace(/@[^\s@#，。！？、:：;；,.!?()（）【】[\]<>《》]+/g, ' ')
 }
 
 function mentionedNames(status) {
   const names = new Set()
-  const text = textOf(status).replace(/https?:\/\/\S+/g, ' ')
+  const text = authorText(status).replace(/https?:\/\/\S+/g, ' ')
   const pattern = /@([^\s@#，。！？、:：;；,.!?()（）【】[\]<>《》]+)/g
   let match = pattern.exec(text)
 
@@ -64,7 +83,7 @@ export function topKeywords(statuses, limit = 10) {
   const counts = new Map()
 
   for (const status of statuses || []) {
-    if (isDeletedPlaceholder(status)) continue
+    if (isUnavailableStatus(status)) continue
     const text = textWithoutUrlsAndMentions(status)
     const words = text.match(/[\u4E00-\u9FFF]{2,}|[a-zA-Z][a-zA-Z0-9-]{1,}/g) || []
 
@@ -85,7 +104,7 @@ export function topMentionedUsers(statuses, limit = 10) {
   const counts = new Map()
 
   for (const status of statuses || []) {
-    if (isDeletedPlaceholder(status)) continue
+    if (isUnavailableStatus(status)) continue
     for (const name of mentionedNames(status)) {
       counts.set(name, (counts.get(name) || 0) + 1)
     }
@@ -102,7 +121,7 @@ export function buildYearView(year, statuses, {
   page = 1,
   pageSize = YEAR_PAGE_SIZE,
 } = {}) {
-  const availableStatuses = (statuses || []).filter(status => !isDeletedPlaceholder(status))
+  const availableStatuses = (statuses || []).filter(status => !isUnavailableStatus(status))
   const ordered = [ ...availableStatuses ].sort(newestFirst)
   const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize))
   const currentPage = Math.min(Math.max(1, page), totalPages)
@@ -135,7 +154,7 @@ export function buildYearView(year, statuses, {
     },
     stats: {
       total: ordered.length,
-      excludedDeleted: (statuses || []).length - ordered.length,
+      excludedUnavailable: (statuses || []).length - ordered.length,
       keywords: topKeywords(ordered),
       mentionedUsers: topMentionedUsers(ordered),
       peakHour: ordered.length ? peakHour : null,

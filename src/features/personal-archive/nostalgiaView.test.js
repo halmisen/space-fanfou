@@ -47,27 +47,38 @@ test('mentions have their own ranking and do not become keywords', () => {
     { id: '2', created_at: '2024-01-03T13:00:00.000Z', text: '转@右才小呗 一起吃饭' },
   ]
 
-  expect(topKeywords(yearlyStatuses)).toEqual([
-    { word: '一起吃饭', count: 1 },
-    { word: '今天真好', count: 1 },
-  ])
+  expect(topKeywords(yearlyStatuses)).toEqual([ { word: '今天真好', count: 1 } ])
   expect(topMentionedUsers(yearlyStatuses)).toEqual([
     { name: '卡饭忍', count: 1 },
-    { name: '右才小呗', count: 1 },
   ])
 })
 
-test('deleted-message placeholders do not appear in a year view or its statistics', () => {
+test('unavailable-message placeholders do not appear in a year view or its statistics', () => {
   const view = buildYearView('2024', [
-    { id: '1', created_at: '2024-01-02T13:00:00.000Z', text: '抱歉，已删除' },
+    { id: '1', created_at: '2024-01-02T13:00:00.000Z', text: '抱歉，饭友已设置仅展示一个月内饭否，此条饭否已不可见' },
     { id: '2', created_at: '2024-01-03T13:00:00.000Z', text: '还在的消息 @卡饭忍' },
   ])
 
   expect(view.statuses.map(status => status.id)).toEqual([ '2' ])
   expect(view.stats.total).toBe(1)
-  expect(view.stats.excludedDeleted).toBe(1)
+  expect(view.stats.excludedUnavailable).toBe(1)
   expect(view.stats.keywords).toEqual([ { word: '还在的消息', count: 1 } ])
   expect(view.stats.mentionedUsers).toEqual([ { name: '卡饭忍', count: 1 } ])
+})
+
+test('annual rankings keep only the author text before a repost marker', () => {
+  const yearlyStatuses = [
+    { text: 'RT @外部用户：转发来源的文字' },
+    { text: '我的评论 转@外部用户：转发来源的文字' },
+    { text: '自己的感受 RT @外部用户：转发来源的文字' },
+    { text: '上传了新照片' },
+  ]
+
+  expect(topKeywords(yearlyStatuses)).toEqual([
+    { word: '我的评论', count: 1 },
+    { word: '自己的感受', count: 1 },
+  ])
+  expect(topMentionedUsers(yearlyStatuses)).toEqual([])
 })
 
 test('year view paginates statuses while keeping annual statistics whole', () => {

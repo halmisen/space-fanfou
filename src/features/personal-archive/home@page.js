@@ -44,6 +44,7 @@ export default context => {
   let nostalgiaTimeline = null
   let yearsElement = null
   let nostalgiaNotice = null
+  let annualSummaryElement = null
   let latestSummary = null
   let recheckTimer = null
 
@@ -63,6 +64,35 @@ export default context => {
     if (stream) stream.style.display = ''
     if (nostalgiaTimeline) nostalgiaTimeline.remove()
     nostalgiaTimeline = null
+    if (annualSummaryElement) annualSummaryElement.replaceChildren()
+  }
+
+  function renderAnnualSummary(view) {
+    if (!annualSummaryElement) return
+
+    const keywordItems = view.stats.keywords.length
+      ? view.stats.keywords.map(item => <li key={item.word}>{ item.word } <span>{ item.count }</span></li>)
+      : <li>这一年没有足够的正文文本</li>
+    const mentionedUserItems = view.stats.mentionedUsers.length
+      ? view.stats.mentionedUsers.map(item => <li key={item.name}>@{ item.name } <span>{ item.count }</span></li>)
+      : <li>这一年没有可统计的提及</li>
+    const unavailableNotice = view.stats.excludedUnavailable
+      ? `已略过 ${view.stats.excludedUnavailable} 条已不可见消息。`
+      : ''
+
+    const summaryNodes = [
+      <h2 key="title">{ view.year } 年回顾</h2>,
+      <p key="meta" className="sf-personal-archive-entry__annual-meta">
+        { view.stats.total } 条消息 · 最常发言 { view.stats.peakHour == null ? '—' : `${view.stats.peakHour}:00` }
+      </p>,
+      <h3 key="keywords-heading">年度十大关键词</h3>,
+      <ol key="keywords" className="sf-personal-archive-entry__annual-list">{ keywordItems }</ol>,
+      <h3 key="mentioned-heading">年度最常提到的饭友</h3>,
+      <ol key="mentioned" className="sf-personal-archive-entry__annual-list">{ mentionedUserItems }</ol>,
+      unavailableNotice && <p key="unavailable" className="formtip">{ unavailableNotice }</p>,
+    ].filter(Boolean)
+
+    annualSummaryElement.replaceChildren(...summaryNodes)
   }
 
   function formatStatusDate(status) {
@@ -91,15 +121,6 @@ export default context => {
         <p>{ status.text || '' }</p>
       </li>
     ))
-    const keywordText = view.stats.keywords.length
-      ? view.stats.keywords.map(item => `${item.word} ${item.count}`).join(' · ')
-      : '这一年没有足够的文本生成关键词'
-    const mentionedUserText = view.stats.mentionedUsers.length
-      ? view.stats.mentionedUsers.map(item => `@${item.name} ${item.count}`).join(' · ')
-      : '这一年没有可统计的提及'
-    const deletedNotice = view.stats.excludedDeleted
-      ? ` · 已略过 ${view.stats.excludedDeleted} 条原消息已删除的占位`
-      : ''
     const pager = view.pagination.totalPages > 1 && (
       <p className="sf-nostalgia-timeline__pager">
         { view.pagination.page > 1 && (
@@ -114,10 +135,7 @@ export default context => {
     nostalgiaTimeline = (
       <section id="sf-nostalgia-timeline" className="sf-nostalgia-timeline">
         <header>
-          <h1>{ view.year } 年的饭否</h1>
-          <p>历史快照 · { view.stats.total } 条消息 · 最常发言时段 { view.stats.peakHour == null ? '—' : `${view.stats.peakHour}:00` }{ deletedNotice }</p>
-          <p className="sf-nostalgia-timeline__keywords">年度十大关键词：{ keywordText }</p>
-          <p className="sf-nostalgia-timeline__keywords">年度最常提到的饭友：{ mentionedUserText }</p>
+          <h1>{ view.year } 年的饭否 <span>· { view.stats.total } 条</span></h1>
           <p><a href="#" onClick={restoreLiveTimeline}>← 回到现在</a></p>
         </header>
         <ol>{ statusNodes }</ol>
@@ -126,6 +144,7 @@ export default context => {
     )
     stream.style.display = 'none'
     stream.before(nostalgiaTimeline)
+    renderAnnualSummary(view)
   }
 
   async function openYear(year, page = 1) {
@@ -205,6 +224,7 @@ export default context => {
     linkElement = <a href="#" onClick={onClickOpenSettings}>设置备份文件夹</a>
     yearsElement = <ul className="sf-personal-archive-entry__years" />
     nostalgiaNotice = <p className="sf-personal-archive-entry__notice" />
+    annualSummaryElement = <div className="sf-personal-archive-entry__annual" />
 
     return (
       <div id="sf-personal-archive-entry" className="sect">
@@ -216,6 +236,7 @@ export default context => {
         <p className="formtip">首页默认仍是现在；选择一年后才切到本地历史快照。</p>
         { yearsElement }
         { nostalgiaNotice }
+        { annualSummaryElement }
       </div>
     )
   }
@@ -261,7 +282,7 @@ export default context => {
 
       if (panel) {
         panel.remove()
-        panel = summaryElement = linkElement = yearsElement = nostalgiaNotice = null
+        panel = summaryElement = linkElement = yearsElement = nostalgiaNotice = annualSummaryElement = null
       }
     },
   }
