@@ -2,6 +2,11 @@
 
 Primary operating contract for agents working in this repository.
 
+The active development line is the `2026.8` branch, not `main`. `AGENTS.md` is
+the short project loop and `GEMINI.md` mirrors it for another agent; keep the
+three consistent when a rule changes. `origin/simplify` is an independent
+rewrite line — never modify or merge it unless the user asks.
+
 ## Workflow Orchestration
 
 ### 1. Plan Node Default
@@ -113,6 +118,9 @@ npx jest -t "test name pattern"
 npx playwright test  # End-to-end specs in tests/playwright/
 ```
 
+Playwright drives the built extension, so rebuild `dist/` before running it.
+Unit tests are colocated `*.test.js` files next to the code they cover.
+
 ## Architecture
 
 The extension compiles into four independent layers; see `docs/architecture.md`.
@@ -149,6 +157,17 @@ storage. Export `isSoldered = true` only for features that cannot be disabled.
 - `src/features/index.js` uses `import-all.macro` for feature discovery.
 - Production output is written to `dist/` with readable minimal minification.
 
+### Build and test traps
+
+- After adding or deleting a `src/features/` subdirectory, force a full rebuild.
+  `import-all.macro` output is cached by `cache-loader` and the Babel AST cache,
+  and a stale hit silently drops the new feature (white settings page).
+- `build/shared.js` enforces `BUNDLE_SIZE_LIMIT` (currently `864 * 1024` bytes)
+  on the entrypoints; a new dependency that breaks it fails the build.
+- `jest.config.js` ignores `worktrees/`, `.claude/worktrees/`, and `.worktrees/`.
+  Worktrees live inside the repo (see `WORKTREES.md`), so a missing pattern makes
+  every suite run twice without any error — keep the two conventions in sync.
+
 ## Tech Stack
 
 - Preact 10; Webpack 4 and Babel
@@ -164,6 +183,8 @@ storage. Export `isSoldered = true` only for features that cannot be disabled.
   CustomEvents through `src/content/environment/bridge.js`.
 - Settings use `chrome.storage.sync` or `chrome.storage.local`, selected per
   option with `disableCloudSyncing`.
+- `.env` holds real Fanfou test-account credentials. It is git-ignored: never
+  commit it, paste its contents, or copy them into code or logs.
 
 ## Common Tasks
 
@@ -181,3 +202,5 @@ Before release, run `npm test` and then `npm run release`.
 - Architecture: `docs/architecture.md`
 - Release process: `docs/publish.md`
 - Contributing: `docs/contributing.md`
+- Failure-mode rules from past regressions: `lessons.md` (read before touching
+  OAuth signing, the MV3 bridge, or service-worker startup)
